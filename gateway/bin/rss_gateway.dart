@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_cors_headers/shelf_cors_headers.dart';
-import 'package:shelf_proxy/shelf_proxy.dart';
 import 'package:shelf_router/shelf_router.dart';
 
 Future<void> main(List<String> args) async {
@@ -56,24 +55,17 @@ Future<void> main(List<String> args) async {
       }
 
       try {
-        final upstreamHandler = proxyHandler(
+        final upstreamResponse = await client.get(
           target,
-          client: client,
-          proxyName: 'readrss_gateway',
+          headers: const <String, String>{
+            'accept':
+                'application/rss+xml, application/atom+xml, application/xml, text/xml, application/feed+json, application/json;q=0.9, */*;q=0.8',
+            'user-agent': 'RSSNewsHub-Gateway/1.0',
+          },
         );
-        final upstreamResponse = await upstreamHandler(
-          Request(
-            request.method,
-            Uri(),
-            headers: const <String, String>{
-              'accept':
-                  'application/rss+xml, application/atom+xml, application/xml, text/xml, application/feed+json, application/json;q=0.9, */*;q=0.8',
-              'user-agent': 'RSSNewsHub-Gateway/1.0',
-            },
-            context: request.context,
-          ),
-        );
-        return upstreamResponse.change(
+        return Response(
+          upstreamResponse.statusCode,
+          body: upstreamResponse.bodyBytes,
           headers: <String, String>{
             ...upstreamResponse.headers,
             if (!upstreamResponse.headers.containsKey('content-type'))
