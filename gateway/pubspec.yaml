@@ -1,0 +1,15 @@
+name: readrss_gateway
+description: RSS gateway for ReadRSS (Render deploy)
+publish_to: 'none'
+version: 1.0.0
+
+environment:
+  sdk: ^3.10.1
+
+dependencies:
+  http: ^1.5.0
+  shelf: ^1.4.2
+  shelf_cors_headers: ^0.1.5
+  shelf_proxy: ^1.0.4
+  shelf_router: ^1.1.4
+

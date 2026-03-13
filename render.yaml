@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: readrss-gateway
+    env: docker
+    plan: free
+    dockerContext: ./gateway
+    dockerfilePath: ./gateway/Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
