@@ -1158,7 +1158,6 @@ class ArticleReaderDialog extends StatelessWidget {
     final hasLink = article.link.trim().isNotEmpty;
     final readerUrl = hasLink ? _buildOverlayReaderUrl(article.link) : null;
     final canEmbedWeb = readerUrl != null;
-    final usingProxyReader = hasLink && readerUrl != article.link;
     final body = article.content.isNotEmpty
         ? article.content
         : (article.summary.isNotEmpty
@@ -1213,13 +1212,7 @@ class ArticleReaderDialog extends StatelessWidget {
                   Chip(label: Text(article.author!)),
                 Chip(label: Text(_friendlyDate(article.publishedAt))),
                 if (canEmbedWeb)
-                  Chip(
-                    label: Text(
-                      usingProxyReader
-                          ? 'Dang mo bai trong overlay (proxy)'
-                          : 'Dang mo trang goc trong overlay',
-                    ),
-                  ),
+                  const Chip(label: Text('Dang mo trang goc trong overlay')),
               ],
             ),
             const SizedBox(height: 18),
@@ -1231,9 +1224,7 @@ class ArticleReaderDialog extends StatelessWidget {
                         Expanded(child: ArticleWebView(url: readerUrl)),
                         const SizedBox(height: 10),
                         Text(
-                          usingProxyReader
-                              ? 'Trang nay chan iframe truc tiep, app da chuyen sang che do proxy de van doc trong alert.'
-                              : 'Neu trang nay chan iframe va hien trong/trang loi, dung "Mo tab moi" de xem ban goc.',
+                          'Neu trang nay chan iframe va hien trong/trang loi, dung "Mo tab moi" de xem ban goc.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface.withValues(
                               alpha: 0.65,
@@ -2078,7 +2069,7 @@ String? _buildOverlayReaderUrl(String rawUrl) {
     return null;
   }
   if (_isKnownIframeBlockedHost(rawUrl)) {
-    return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(rawUrl)}';
+    return null;
   }
   return rawUrl;
 }
