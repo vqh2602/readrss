@@ -63,12 +63,18 @@ Future<void> main(List<String> args) async {
             'user-agent': 'RSSNewsHub-Gateway/1.0',
           },
         );
+        final passthroughHeaders = <String, String>{};
+        for (final entry in upstreamResponse.headers.entries) {
+          if (!_hopByHopHeaders.contains(entry.key.toLowerCase())) {
+            passthroughHeaders[entry.key] = entry.value;
+          }
+        }
         return Response(
           upstreamResponse.statusCode,
           body: upstreamResponse.bodyBytes,
           headers: <String, String>{
-            ...upstreamResponse.headers,
-            if (!upstreamResponse.headers.containsKey('content-type'))
+            ...passthroughHeaders,
+            if (!passthroughHeaders.containsKey('content-type'))
               'content-type': 'application/xml; charset=utf-8',
             'cache-control': 'no-store',
           },
@@ -168,3 +174,15 @@ bool _isBlockedHost(String host) {
   }
   return false;
 }
+
+const Set<String> _hopByHopHeaders = <String>{
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'content-length',
+};
