@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,8 +13,8 @@ void main() {
     await tester.pumpWidget(const ReadRssApp());
     await tester.pump();
 
-    expect(find.text('ReadRSS'), findsOneWidget);
-    expect(find.text('Chua co nguon RSS nao'), findsOneWidget);
+    expect(find.text('Recent Feeds'), findsWidgets);
     expect(find.textContaining('Them nguon'), findsWidgets);
+    expect(find.byIcon(Icons.dashboard_customize_outlined), findsOneWidget);
   });
 }

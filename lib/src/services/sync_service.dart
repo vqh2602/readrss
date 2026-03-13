@@ -61,7 +61,7 @@ class SyncService {
       'syncLink': buildSyncLink(state),
     });
     final summary =
-        'ReadRSS backup | feeds: ${snapshot.feeds.length} | ${snapshot.exportedAt.toIso8601String()}';
+        'RSS News Hub backup | feeds: ${snapshot.feeds.length} | ${snapshot.exportedAt.toIso8601String()}';
     final success = await _browserBridge.sendDiscordBackup(
       webhookUrl: backupWebhookUrl,
       summary: summary,

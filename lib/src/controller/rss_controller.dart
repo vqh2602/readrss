@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -93,7 +92,11 @@ class RssController extends ChangeNotifier {
   }
 
   int articleCountForFeed(String feedId) {
-    return _itemsByFeed[feedId]?.length ?? 0;
+    if (_itemsByFeed.containsKey(feedId)) {
+      return _itemsByFeed[feedId]?.length ?? 0;
+    }
+    final feed = _feeds.where((item) => item.id == feedId).firstOrNull;
+    return feed?.cachedArticleCount ?? 0;
   }
 
   bool isArticleUnread(String articleId) {
@@ -104,6 +107,13 @@ class RssController extends ChangeNotifier {
     final restored = await _storageService.load();
     _feeds = restored.feeds;
     _settings = restored.settings;
+    _itemsByFeed
+      ..clear()
+      ..addAll(
+        restored.cachedArticlesByFeed.map(
+          (feedId, items) => MapEntry(feedId, List<NewsItem>.from(items)),
+        ),
+      );
     _knownArticleIds
       ..clear()
       ..addAll(restored.knownArticleIds);
@@ -116,6 +126,7 @@ class RssController extends ChangeNotifier {
       final state = imported.toPersistedState();
       _feeds = state.feeds;
       _settings = state.settings;
+      _itemsByFeed.clear();
       _knownArticleIds.clear();
       _unreadArticleIds.clear();
       _syncService.clearSyncFragment();
@@ -190,6 +201,20 @@ class RssController extends ChangeNotifier {
     return removed == null
         ? 'Khong tim thay feed can xoa.'
         : 'Da xoa nguon ${removed.title}.';
+  }
+
+  Future<String> updateFeedRefreshInterval(
+    String feedId,
+    Duration refreshInterval,
+  ) async {
+    final index = _feeds.indexWhere((feed) => feed.id == feedId);
+    if (index == -1) {
+      throw StateError('Khong tim thay feed can cap nhat.');
+    }
+    _feeds[index] = _feeds[index].copyWith(refreshInterval: refreshInterval);
+    await _persist();
+    notifyListeners();
+    return 'Da cap nhat chu ky lam moi cho ${_feeds[index].title}.';
   }
 
   Future<void> refreshAll({
@@ -391,6 +416,7 @@ class RssController extends ChangeNotifier {
       newItemsAccumulator.addAll(newItems);
       return feed.copyWith(
         title: refreshed.resolvedTitle,
+        cachedArticleCount: refreshed.items.length,
         lastFetchedAt: refreshed.fetchedAt,
         clearLastError: true,
       );
@@ -466,6 +492,9 @@ class RssController extends ChangeNotifier {
       settings: _settings,
       knownArticleIds: _knownArticleIds.toList(),
       unreadArticleIds: _unreadArticleIds.toList(),
+      cachedArticlesByFeed: _itemsByFeed.map(
+        (feedId, items) => MapEntry(feedId, List<NewsItem>.from(items)),
+      ),
     );
   }
 
@@ -486,7 +515,10 @@ class RssController extends ChangeNotifier {
   }
 
   void _syncBadge() {
-    _browserBridge.syncUnreadBadge(count: unreadCount, appTitle: 'ReadRSS');
+    _browserBridge.syncUnreadBadge(
+      count: unreadCount,
+      appTitle: 'RSS News Hub',
+    );
   }
 
   String _createFeedId(String url) {

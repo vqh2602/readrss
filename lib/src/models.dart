@@ -27,6 +27,7 @@ class FeedSource {
     required this.title,
     required this.url,
     required this.refreshInterval,
+    this.cachedArticleCount = 0,
     this.lastFetchedAt,
     this.lastError,
     this.enabled = true,
@@ -36,6 +37,7 @@ class FeedSource {
   final String title;
   final String url;
   final Duration refreshInterval;
+  final int cachedArticleCount;
   final DateTime? lastFetchedAt;
   final String? lastError;
   final bool enabled;
@@ -44,6 +46,7 @@ class FeedSource {
     String? title,
     String? url,
     Duration? refreshInterval,
+    int? cachedArticleCount,
     DateTime? lastFetchedAt,
     String? lastError,
     bool clearLastError = false,
@@ -54,6 +57,7 @@ class FeedSource {
       title: title ?? this.title,
       url: url ?? this.url,
       refreshInterval: refreshInterval ?? this.refreshInterval,
+      cachedArticleCount: cachedArticleCount ?? this.cachedArticleCount,
       lastFetchedAt: lastFetchedAt ?? this.lastFetchedAt,
       lastError: clearLastError ? null : lastError ?? this.lastError,
       enabled: enabled ?? this.enabled,
@@ -66,6 +70,7 @@ class FeedSource {
       'title': title,
       'url': url,
       'refreshIntervalMinutes': refreshInterval.inMinutes,
+      'cachedArticleCount': cachedArticleCount,
       'lastFetchedAt': lastFetchedAt?.toIso8601String(),
       'lastError': lastError,
       'enabled': enabled,
@@ -80,6 +85,7 @@ class FeedSource {
       refreshInterval: Duration(
         minutes: (json['refreshIntervalMinutes'] as num?)?.toInt() ?? 15,
       ),
+      cachedArticleCount: (json['cachedArticleCount'] as num?)?.toInt() ?? 0,
       lastFetchedAt: json['lastFetchedAt'] == null
           ? null
           : DateTime.tryParse(json['lastFetchedAt'] as String),
@@ -131,6 +137,38 @@ class NewsItem {
   }) {
     final raw = '$feedId|$guid|$link|$title|${publishedAt.toIso8601String()}';
     return base64Url.encode(utf8.encode(raw)).replaceAll('=', '');
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'feedId': feedId,
+      'feedTitle': feedTitle,
+      'title': title,
+      'link': link,
+      'publishedAt': publishedAt.toIso8601String(),
+      'summary': summary,
+      'content': content,
+      'author': author,
+      'imageUrl': imageUrl,
+    };
+  }
+
+  static NewsItem fromJson(Map<String, dynamic> json) {
+    return NewsItem(
+      id: json['id'] as String,
+      feedId: json['feedId'] as String,
+      feedTitle: json['feedTitle'] as String,
+      title: json['title'] as String,
+      link: json['link'] as String? ?? '',
+      publishedAt:
+          DateTime.tryParse(json['publishedAt'] as String? ?? '') ??
+          DateTime.now(),
+      summary: json['summary'] as String? ?? '',
+      content: json['content'] as String? ?? '',
+      author: json['author'] as String?,
+      imageUrl: json['imageUrl'] as String?,
+    );
   }
 }
 
@@ -198,12 +236,14 @@ class PersistedState {
     required this.settings,
     required this.knownArticleIds,
     required this.unreadArticleIds,
+    required this.cachedArticlesByFeed,
   });
 
   final List<FeedSource> feeds;
   final ReaderSettings settings;
   final List<String> knownArticleIds;
   final List<String> unreadArticleIds;
+  final Map<String, List<NewsItem>> cachedArticlesByFeed;
 
   factory PersistedState.initial() {
     return const PersistedState(
@@ -211,6 +251,7 @@ class PersistedState {
       settings: ReaderSettings(),
       knownArticleIds: <String>[],
       unreadArticleIds: <String>[],
+      cachedArticlesByFeed: <String, List<NewsItem>>{},
     );
   }
 
@@ -220,6 +261,10 @@ class PersistedState {
       'settings': settings.toJson(),
       'knownArticleIds': knownArticleIds,
       'unreadArticleIds': unreadArticleIds,
+      'cachedArticlesByFeed': cachedArticlesByFeed.map(
+        (feedId, items) =>
+            MapEntry(feedId, items.map((item) => item.toJson()).toList()),
+      ),
     };
   }
 
@@ -248,6 +293,21 @@ class PersistedState {
           (json['unreadArticleIds'] as List<dynamic>? ?? const <dynamic>[])
               .map((item) => item.toString())
               .toList(),
+      cachedArticlesByFeed:
+          ((json['cachedArticlesByFeed'] as Map<dynamic, dynamic>?) ??
+                  const <dynamic, dynamic>{})
+              .map(
+                (feedId, items) => MapEntry(
+                  feedId.toString(),
+                  (items as List<dynamic>? ?? const <dynamic>[])
+                      .whereType<Map<dynamic, dynamic>>()
+                      .map(
+                        (item) =>
+                            NewsItem.fromJson(Map<String, dynamic>.from(item)),
+                      )
+                      .toList(),
+                ),
+              ),
     );
   }
 }
@@ -280,6 +340,7 @@ class BackupSnapshot {
       settings: settings,
       knownArticleIds: const <String>[],
       unreadArticleIds: const <String>[],
+      cachedArticlesByFeed: const <String, List<NewsItem>>{},
     );
   }
 

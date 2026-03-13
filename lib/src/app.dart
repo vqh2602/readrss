@@ -36,7 +36,7 @@ class _ReadRssAppState extends State<ReadRssApp> {
       animation: _controller,
       builder: (context, child) {
         return MaterialApp(
-          title: 'ReadRSS',
+          title: 'RSS News Hub',
           debugShowCheckedModeBanner: false,
           themeMode: _controller.settings.themeMode,
           theme: _buildTheme(Brightness.light),
@@ -59,18 +59,33 @@ class _ReadRssAppState extends State<ReadRssApp> {
       surface: isDark ? const Color(0xFF152128) : const Color(0xFFF7F4EC),
     );
     final textTheme = GoogleFonts.soraTextTheme().copyWith(
-      headlineLarge: GoogleFonts.spaceGrotesk(
-        fontSize: 38,
-        fontWeight: FontWeight.w700,
-      ),
-      headlineMedium: GoogleFonts.spaceGrotesk(
-        fontSize: 28,
-        fontWeight: FontWeight.w700,
-      ),
-      titleLarge: GoogleFonts.spaceGrotesk(
+      displaySmall: GoogleFonts.spaceGrotesk(
         fontSize: 22,
         fontWeight: FontWeight.w700,
       ),
+      headlineLarge: GoogleFonts.spaceGrotesk(
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+      ),
+      headlineMedium: GoogleFonts.spaceGrotesk(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+      ),
+      headlineSmall: GoogleFonts.spaceGrotesk(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+      ),
+      titleLarge: GoogleFonts.spaceGrotesk(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+      ),
+      titleMedium: GoogleFonts.sora(fontSize: 13, fontWeight: FontWeight.w600),
+      titleSmall: GoogleFonts.sora(fontSize: 11.5, fontWeight: FontWeight.w600),
+      bodyLarge: GoogleFonts.sora(fontSize: 12.5, fontWeight: FontWeight.w500),
+      bodyMedium: GoogleFonts.sora(fontSize: 11.5, fontWeight: FontWeight.w500),
+      bodySmall: GoogleFonts.sora(fontSize: 10, fontWeight: FontWeight.w500),
+      labelLarge: GoogleFonts.sora(fontSize: 11, fontWeight: FontWeight.w700),
+      labelSmall: GoogleFonts.sora(fontSize: 9.5, fontWeight: FontWeight.w700),
     );
     return ThemeData(
       useMaterial3: true,
@@ -78,12 +93,12 @@ class _ReadRssAppState extends State<ReadRssApp> {
       colorScheme: colorScheme,
       textTheme: textTheme,
       scaffoldBackgroundColor: Colors.transparent,
-      cardTheme: CardTheme(
-        color: colorScheme.surface.withOpacity(isDark ? 0.82 : 0.92),
+      cardTheme: CardThemeData(
+        color: colorScheme.surface.withValues(alpha: isDark ? 0.82 : 0.92),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       ),
@@ -94,7 +109,7 @@ class _ReadRssAppState extends State<ReadRssApp> {
           color: colorScheme.surface,
         ),
       ),
-      dividerColor: colorScheme.onSurface.withOpacity(0.08),
+      dividerColor: colorScheme.onSurface.withValues(alpha: 0.08),
     );
   }
 }

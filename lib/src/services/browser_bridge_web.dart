@@ -1,39 +1,41 @@
-import 'dart:html' as html;
-import 'dart:js_util' as js_util;
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
+
+import 'package:web/web.dart' as web;
 
 import 'browser_bridge.dart';
 
 class _BrowserBridgeWeb implements BrowserBridge {
   @override
-  String get currentUrl => html.window.location.href;
+  String get currentUrl => web.window.location.href;
 
   @override
   NotificationAccess get notificationAccess {
-    if (!html.Notification.supported) {
+    if (!web.window.has('Notification')) {
       return NotificationAccess.unsupported;
     }
-    return _mapPermission(html.Notification.permission);
+    return _mapPermission(web.Notification.permission);
   }
 
   @override
   void clearSyncFragment() {
-    final location = html.window.location;
+    final location = web.window.location;
     final target = '${location.pathname}${location.search}';
-    html.window.history.replaceState(null, html.document.title, target);
+    web.window.history.replaceState(null, web.document.title, target);
   }
 
   @override
   void openExternal(String url) {
-    html.window.open(url, '_blank');
+    web.window.open(url, '_blank');
   }
 
   @override
   Future<NotificationAccess> requestNotificationPermission() async {
-    if (!html.Notification.supported) {
+    if (!web.window.has('Notification')) {
       return NotificationAccess.unsupported;
     }
-    final permission = await html.Notification.requestPermission();
-    return _mapPermission(permission);
+    final permission = await web.Notification.requestPermission().toDart;
+    return _mapPermission(permission.toDart);
   }
 
   @override
@@ -43,24 +45,19 @@ class _BrowserBridgeWeb implements BrowserBridge {
     required String jsonPayload,
   }) async {
     try {
-      final formData = html.FormData();
-      formData.append('content', summary);
-      formData.appendBlob(
-        'file',
-        html.Blob(<Object>[jsonPayload], 'application/json'),
-        'readrss-backup.json',
+      final formData = web.FormData();
+      formData.append('content', summary.toJS);
+      final blob = web.Blob(
+        <JSAny>[jsonPayload.toJS].toJS,
+        web.BlobPropertyBag(type: 'application/json'),
       );
-      final options = js_util.jsify(<String, Object?>{
-        'method': 'POST',
-        'body': formData,
-        'mode': 'no-cors',
-      });
-      await js_util.promiseToFuture<void>(
-        js_util.callMethod(html.window, 'fetch', <Object?>[
-          webhookUrl,
-          options,
-        ]),
-      );
+      formData.append('file', blob, 'readrss-backup.json');
+      await web.window
+          .fetch(
+            webhookUrl.toJS,
+            web.RequestInit(method: 'POST', body: formData, mode: 'no-cors'),
+          )
+          .toDart;
       return true;
     } catch (_) {
       return false;
@@ -76,21 +73,23 @@ class _BrowserBridgeWeb implements BrowserBridge {
     if (notificationAccess != NotificationAccess.granted) {
       return;
     }
-    html.Notification(title, body: body, icon: iconUrl, silent: false);
+    web.Notification(
+      title,
+      web.NotificationOptions(body: body, icon: iconUrl ?? '', silent: false),
+    );
   }
 
   @override
   void syncUnreadBadge({required int count, required String appTitle}) {
-    html.document.title = count > 0 ? '($count) $appTitle' : appTitle;
-    final navigator = html.window.navigator;
-    try {
-      if (count > 0 && js_util.hasProperty(navigator, 'setAppBadge')) {
-        js_util.callMethod(navigator, 'setAppBadge', <Object>[count]);
-      } else if (js_util.hasProperty(navigator, 'clearAppBadge')) {
-        js_util.callMethod(navigator, 'clearAppBadge', const <Object>[]);
-      }
-    } catch (_) {
-      // Ignore unsupported browser badge APIs.
+    web.document.title = count > 0 ? '($count) $appTitle' : appTitle;
+    if (!web.window.navigator.has('setAppBadge') ||
+        !web.window.navigator.has('clearAppBadge')) {
+      return;
+    }
+    if (count > 0) {
+      web.window.navigator.setAppBadge(count).toDart.ignore();
+    } else {
+      web.window.navigator.clearAppBadge().toDart.ignore();
     }
   }
 
@@ -101,6 +100,10 @@ class _BrowserBridgeWeb implements BrowserBridge {
       _ => NotificationAccess.pending,
     };
   }
+}
+
+extension on Future<Object?> {
+  void ignore() {}
 }
 
 BrowserBridge createBrowserBridgeImpl() => _BrowserBridgeWeb();

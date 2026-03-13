@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../controller/rss_controller.dart';
 import '../models.dart';
+import 'article_web_view.dart';
 
 class ReadRssHomePage extends StatefulWidget {
   const ReadRssHomePage({super.key, required this.controller});
@@ -19,34 +20,40 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            theme.colorScheme.surface,
-            theme.colorScheme.primary.withOpacity(0.14),
-            theme.colorScheme.secondary.withOpacity(0.12),
-          ],
-        ),
-      ),
-      child: SafeArea(
-        child: AnimatedBuilder(
-          animation: controller,
-          builder: (context, child) {
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final isDesktop = constraints.maxWidth >= 1160;
-                return Padding(
-                  padding: EdgeInsets.all(isDesktop ? 24 : 16),
-                  child: isDesktop
-                      ? _buildDesktopLayout(context)
-                      : _buildMobileLayout(context),
+    return Material(
+      color: Colors.transparent,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                theme.colorScheme.surface,
+                theme.colorScheme.primary.withValues(alpha: 0.14),
+                theme.colorScheme.secondary.withValues(alpha: 0.12),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: AnimatedBuilder(
+              animation: controller,
+              builder: (context, child) {
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isDesktop = constraints.maxWidth >= 1160;
+                    return Padding(
+                      padding: EdgeInsets.all(isDesktop ? 24 : 16),
+                      child: isDesktop
+                          ? _buildDesktopLayout(context)
+                          : _buildMobileLayout(context),
+                    );
+                  },
                 );
               },
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
@@ -55,149 +62,93 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
   Widget _buildDesktopLayout(BuildContext context) {
     return Row(
       children: <Widget>[
-        Expanded(
-          flex: 8,
-          child: Column(
-            children: <Widget>[
-              _buildHeader(context, compact: false),
-              const SizedBox(height: 18),
-              Expanded(child: _buildArticlesPanel(context)),
-            ],
-          ),
-        ),
-        const SizedBox(width: 18),
-        SizedBox(
-          width: 360,
-          child: Column(
-            children: <Widget>[
-              _buildFeedPanel(context),
-              const SizedBox(height: 18),
-              Expanded(
-                child: ListView(
-                  children: <Widget>[
-                    _buildControlsPanel(context),
-                    const SizedBox(height: 18),
-                    _buildRecentPanel(context),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+        Expanded(child: _buildArticlesPanel(context)),
+        const SizedBox(width: 12),
+        SizedBox(width: 92, child: _buildQuickRail(context, vertical: true)),
       ],
     );
   }
 
   Widget _buildMobileLayout(BuildContext context) {
-    return ListView(
+    return Column(
       children: <Widget>[
-        _buildHeader(context, compact: true),
-        const SizedBox(height: 16),
-        _buildFeedPanel(context),
-        const SizedBox(height: 16),
-        _buildArticlesPanel(context, shrinkWrap: true),
+        Align(
+          alignment: Alignment.centerRight,
+          child: _buildQuickRail(context, vertical: false),
+        ),
+        const SizedBox(height: 10),
+        Expanded(child: _buildArticlesPanel(context)),
       ],
     );
   }
 
-  Widget _buildHeader(BuildContext context, {required bool compact}) {
-    final theme = Theme.of(context);
-    final allCount = controller.feeds.fold<int>(
-      0,
-      (total, feed) => total + controller.articleCountForFeed(feed.id),
+  Widget _buildQuickRail(BuildContext context, {required bool vertical}) {
+    final selectedTitle = controller.selectedFeed?.title ?? 'Tat ca';
+    final unreadCount = controller.unreadCount;
+    final feedCount = controller.feeds.length;
+    final isMobileCompact = !vertical;
+
+    final summary = _BrandLogoCard(
+      vertical: vertical,
+      mobileCompact: isMobileCompact,
+      selectedTitle: selectedTitle,
+      feedCount: feedCount,
+      unreadCount: unreadCount,
     );
-    return _GlassPanel(
-      padding: EdgeInsets.all(compact ? 18 : 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: <Widget>[
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text('ReadRSS', style: theme.textTheme.headlineLarge),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Web doc RSS hien dai, de them nguon, de doc, co auto refresh, thong bao, sao luu va dong bo bang link.',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.72),
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: <Widget>[
-                  FilledButton.icon(
-                    onPressed: _showAddFeedDialog,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Them nguon'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: controller.hasFeeds && !controller.isRefreshing
-                        ? () async {
-                            await controller.refreshAll();
-                          }
-                        : null,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Lam moi'),
-                  ),
-                  IconButton.filledTonal(
-                    onPressed: () => _showControlsSheet(context),
-                    icon: const Icon(Icons.tune),
-                    tooltip: 'Cai dat',
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: <Widget>[
-              _MetricChip(
-                icon: Icons.rss_feed_rounded,
-                label: '${controller.feeds.length} nguon',
-              ),
-              _MetricChip(
-                icon: Icons.article_outlined,
-                label: '$allCount bai da tai',
-              ),
-              _MetricChip(
-                icon: Icons.notifications_active_outlined,
-                label: '${controller.unreadCount} tin moi',
-              ),
-              _MetricChip(
-                icon: controller.settings.autoRefreshEnabled
-                    ? Icons.schedule
-                    : Icons.pause_circle_outline,
-                label: controller.settings.autoRefreshEnabled
-                    ? 'Auto refresh bat'
-                    : 'Auto refresh tat',
-              ),
-            ],
-          ),
-          if (controller.lastStatus != null) ...<Widget>[
-            const SizedBox(height: 18),
-            Text(
-              controller.lastStatus!,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.66),
-              ),
-            ),
-          ],
-        ],
+
+    final menuButton = Tooltip(
+      message: 'Feed va cai dat',
+      child: IconButton.filled(
+        onPressed: () => _showControlsSheet(context),
+        icon: const Icon(Icons.dashboard_customize_outlined),
       ),
+    );
+    final addButton = Tooltip(
+      message: 'Them feed',
+      child: IconButton.filledTonal(
+        onPressed: _showAddFeedDialog,
+        icon: const Icon(Icons.add),
+      ),
+    );
+    final refreshButton = Tooltip(
+      message: 'Lam moi',
+      child: IconButton.filledTonal(
+        onPressed: controller.hasFeeds && !controller.isRefreshing
+            ? () async {
+                await controller.refreshAll();
+              }
+            : null,
+        icon: const Icon(Icons.refresh),
+      ),
+    );
+
+    return _GlassPanel(
+      padding: EdgeInsets.symmetric(
+        horizontal: vertical ? 8 : 6,
+        vertical: vertical ? 10 : 6,
+      ),
+      child: vertical
+          ? Column(
+              children: <Widget>[
+                summary,
+                const SizedBox(height: 8),
+                menuButton,
+                const SizedBox(height: 6),
+                addButton,
+                const SizedBox(height: 6),
+                refreshButton,
+              ],
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                summary,
+                const SizedBox(width: 6),
+                menuButton,
+                addButton,
+                refreshButton,
+              ],
+            ),
     );
   }
 
@@ -215,7 +166,12 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
           Row(
             children: <Widget>[
               Expanded(
-                child: Text('Recent Feeds', style: theme.textTheme.titleLarge),
+                child: Text(
+                  'Recent Feeds',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               IconButton(
                 onPressed: _showAddFeedDialog,
@@ -236,7 +192,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
             Text(
               'Chua co nguon RSS nao. Them nguon dau tien de bat dau.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             )
           else
@@ -253,7 +209,9 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
                   onTap: () => controller.setSelectedFeed(feed.id),
                   menu: PopupMenuButton<String>(
                     onSelected: (value) async {
-                      if (value == 'refresh') {
+                      if (value == 'edit') {
+                        await _showEditFeedDialog(feed);
+                      } else if (value == 'refresh') {
                         await controller.refreshFeed(feed.id);
                       } else if (value == 'remove') {
                         final message = await controller.removeFeed(feed.id);
@@ -263,6 +221,10 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
                       }
                     },
                     itemBuilder: (context) => const <PopupMenuEntry<String>>[
+                      PopupMenuItem<String>(
+                        value: 'edit',
+                        child: Text('Sua chu ky lam moi'),
+                      ),
                       PopupMenuItem<String>(
                         value: 'refresh',
                         child: Text('Lam moi feed'),
@@ -294,7 +256,9 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
           Expanded(
             child: Text(
               controller.selectedFeed?.title ?? 'Recent Feeds',
-              style: theme.textTheme.titleLarge,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           _DisplayModePicker(
@@ -361,7 +325,12 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('Cai dat va dong bo', style: theme.textTheme.titleLarge),
+          Text(
+            'Cai dat va dong bo',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 18),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -457,14 +426,16 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
         children: <Widget>[
           Text(
             controller.selectedFeed?.title ?? 'Recent in Feed',
-            style: theme.textTheme.titleLarge,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 16),
           if (articles.isEmpty)
             Text(
               'Chua co bai viet nao duoc tai.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             )
           else
@@ -479,7 +450,9 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
                       child: Ink(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurface.withOpacity(0.04),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.04,
+                          ),
                           borderRadius: BorderRadius.circular(18),
                         ),
                         child: Column(
@@ -502,8 +475,8 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
                             Text(
                               _friendlyDate(article.publishedAt),
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacity(
-                                  0.6,
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.6,
                                 ),
                               ),
                             ),
@@ -568,20 +541,25 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        color: theme.colorScheme.onSurface.withOpacity(0.04),
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
         border: Border.all(
-          color: theme.colorScheme.onSurface.withOpacity(0.08),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('Chua co nguon RSS nao', style: theme.textTheme.headlineMedium),
+          Text(
+            'Chua co nguon RSS nao',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 12),
           Text(
             'Them URL RSS de hien thi tin moi nhat, sap xep theo thoi gian, nhan thong bao khi co bai moi va doc ngay trong overlay.',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               height: 1.5,
             ),
           ),
@@ -633,6 +611,18 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
     _showSnack(message);
   }
 
+  Future<void> _showEditFeedDialog(FeedSource feed) async {
+    final message = await showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => EditFeedDialog(controller: controller, feed: feed),
+    );
+    if (!mounted || message == null) {
+      return;
+    }
+    _showSnack(message);
+  }
+
   Future<void> _copySyncLink() async {
     final link = controller.buildSyncLink();
     await Clipboard.setData(ClipboardData(text: link));
@@ -643,6 +633,39 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
 
   Future<void> _showControlsSheet(BuildContext context) async {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.sizeOf(context);
+    final panelChildren = <Widget>[
+      _buildFeedPanel(context),
+      const SizedBox(height: 16),
+      _buildControlsPanel(context),
+      const SizedBox(height: 16),
+      _buildRecentPanel(context),
+    ];
+
+    if (screenSize.width >= 1160) {
+      final panelWidth = (screenSize.width * 0.28).clamp(320.0, 380.0);
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withValues(alpha: 0.16),
+        builder: (dialogContext) {
+          return SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 24, 24),
+                child: SizedBox(
+                  width: panelWidth,
+                  child: ListView(shrinkWrap: true, children: panelChildren),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+      return;
+    }
+
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -653,16 +676,10 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
           child: Material(
             color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(28),
+            clipBehavior: Clip.antiAlias,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: ListView(
-                shrinkWrap: true,
-                children: <Widget>[
-                  _buildControlsPanel(context),
-                  const SizedBox(height: 16),
-                  _buildRecentPanel(context),
-                ],
-              ),
+              child: ListView(shrinkWrap: true, children: panelChildren),
             ),
           ),
         );
@@ -675,7 +692,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (context) => ArticleReaderDialog(
         article: article,
         onOpenOriginal: () => controller.openOriginalArticle(article.link),
@@ -697,10 +714,11 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
   }
 
   String _describeFeedStatus(FeedSource feed) {
+    final interval = _formatRefreshInterval(feed.refreshInterval);
     if (feed.lastFetchedAt == null) {
-      return 'Chua tai du lieu';
+      return 'Chua tai du lieu • $interval';
     }
-    return 'Cap nhat ${_friendlyDate(feed.lastFetchedAt!)}';
+    return 'Cap nhat ${_friendlyDate(feed.lastFetchedAt!)} • $interval';
   }
 
   List<Widget> _withSpacing(List<Widget> widgets, double spacing) {
@@ -745,6 +763,7 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      clipBehavior: Clip.antiAlias,
       title: const Text('Add Feed'),
       content: SizedBox(
         width: 760,
@@ -778,15 +797,9 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
                 SizedBox(
                   width: 180,
                   child: DropdownButtonFormField<int>(
-                    value: _intervalMinutes,
+                    initialValue: _intervalMinutes,
                     decoration: const InputDecoration(labelText: 'Lam moi'),
-                    items: const <DropdownMenuItem<int>>[
-                      DropdownMenuItem(value: 5, child: Text('Moi 5 phut')),
-                      DropdownMenuItem(value: 15, child: Text('Moi 15 phut')),
-                      DropdownMenuItem(value: 30, child: Text('Moi 30 phut')),
-                      DropdownMenuItem(value: 60, child: Text('Moi 1 gio')),
-                      DropdownMenuItem(value: 180, child: Text('Moi 3 gio')),
-                    ],
+                    items: _buildRefreshIntervalItems(_intervalMinutes),
                     onChanged: (value) {
                       if (value != null) {
                         setState(() {
@@ -833,7 +846,7 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
                 borderRadius: BorderRadius.circular(22),
                 color: Theme.of(
                   context,
-                ).colorScheme.onSurface.withOpacity(0.04),
+                ).colorScheme.onSurface.withValues(alpha: 0.04),
               ),
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -933,6 +946,114 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
   }
 }
 
+class EditFeedDialog extends StatefulWidget {
+  const EditFeedDialog({
+    super.key,
+    required this.controller,
+    required this.feed,
+  });
+
+  final RssController controller;
+  final FeedSource feed;
+
+  @override
+  State<EditFeedDialog> createState() => _EditFeedDialogState();
+}
+
+class _EditFeedDialogState extends State<EditFeedDialog> {
+  late int _intervalMinutes = widget.feed.refreshInterval.inMinutes;
+  bool _isSaving = false;
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      clipBehavior: Clip.antiAlias,
+      title: const Text('Sua chu ky lam moi'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              widget.feed.title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.feed.url,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 18),
+            DropdownButtonFormField<int>(
+              initialValue: _intervalMinutes,
+              decoration: const InputDecoration(labelText: 'Lam moi'),
+              items: _buildRefreshIntervalItems(_intervalMinutes),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _intervalMinutes = value;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Chu ky hien tai: ${_formatRefreshInterval(Duration(minutes: _intervalMinutes))}',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            if (_error != null) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Huy'),
+        ),
+        FilledButton(
+          onPressed: _isSaving ? null : _submit,
+          child: const Text('Luu'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _isSaving = true;
+      _error = null;
+    });
+    try {
+      final message = await widget.controller.updateFeedRefreshInterval(
+        widget.feed.id,
+        Duration(minutes: _intervalMinutes),
+      );
+      if (mounted) {
+        Navigator.of(context).pop(message);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString().replaceFirst('StateError: ', '');
+          _isSaving = false;
+        });
+      }
+    }
+  }
+}
+
 class ImportSyncDialog extends StatefulWidget {
   const ImportSyncDialog({super.key, required this.controller});
 
@@ -956,6 +1077,7 @@ class _ImportSyncDialogState extends State<ImportSyncDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      clipBehavior: Clip.antiAlias,
       title: const Text('Nhap link dong bo'),
       content: SizedBox(
         width: 560,
@@ -1033,6 +1155,10 @@ class ArticleReaderDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasLink = article.link.trim().isNotEmpty;
+    final readerUrl = hasLink ? _buildOverlayReaderUrl(article.link) : null;
+    final canEmbedWeb = readerUrl != null;
+    final usingProxyReader = hasLink && readerUrl != article.link;
     final body = article.content.isNotEmpty
         ? article.content
         : (article.summary.isNotEmpty
@@ -1041,6 +1167,7 @@ class ArticleReaderDialog extends StatelessWidget {
 
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
+      clipBehavior: Clip.antiAlias,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 980, maxHeight: 760),
         padding: const EdgeInsets.all(28),
@@ -1063,7 +1190,10 @@ class ArticleReaderDialog extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         article.title,
-                        style: theme.textTheme.headlineMedium,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
                       ),
                     ],
                   ),
@@ -1082,30 +1212,59 @@ class ArticleReaderDialog extends StatelessWidget {
                 if (article.author != null && article.author!.trim().isNotEmpty)
                   Chip(label: Text(article.author!)),
                 Chip(label: Text(_friendlyDate(article.publishedAt))),
+                if (canEmbedWeb)
+                  Chip(
+                    label: Text(
+                      usingProxyReader
+                          ? 'Dang mo bai trong overlay (proxy)'
+                          : 'Dang mo trang goc trong overlay',
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 18),
-            if (article.imageUrl != null) ...<Widget>[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: Image.network(
-                  article.imageUrl!,
-                  height: 260,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const SizedBox.shrink(),
-                ),
-              ),
-              const SizedBox(height: 18),
-            ],
             Expanded(
-              child: SingleChildScrollView(
-                child: SelectableText(
-                  body,
-                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.7),
-                ),
-              ),
+              child: canEmbedWeb
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Expanded(child: ArticleWebView(url: readerUrl)),
+                        const SizedBox(height: 10),
+                        Text(
+                          usingProxyReader
+                              ? 'Trang nay chan iframe truc tiep, app da chuyen sang che do proxy de van doc trong alert.'
+                              : 'Neu trang nay chan iframe va hien trong/trang loi, dung "Mo tab moi" de xem ban goc.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.65,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          if (hasLink)
+                            Text(
+                              'Khong the mo trang nay trong overlay, app dang hien noi dung RSS thay the.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.65,
+                                ),
+                              ),
+                            ),
+                          if (hasLink) const SizedBox(height: 14),
+                          SelectableText(
+                            body,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              height: 1.7,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
             ),
             const SizedBox(height: 18),
             Row(
@@ -1113,7 +1272,7 @@ class ArticleReaderDialog extends StatelessWidget {
                 FilledButton.tonalIcon(
                   onPressed: onOpenOriginal,
                   icon: const Icon(Icons.open_in_new),
-                  label: const Text('Mo bai goc'),
+                  label: const Text('Mo tab moi'),
                 ),
                 const Spacer(),
                 FilledButton(
@@ -1138,53 +1297,299 @@ class _GlassPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        color: theme.colorScheme.surface.withOpacity(0.78),
-        border: Border.all(
-          color: theme.colorScheme.onSurface.withOpacity(0.08),
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            blurRadius: 48,
-            offset: const Offset(0, 26),
-            color: theme.colorScheme.primary.withOpacity(0.12),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(30),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          color: theme.colorScheme.surface.withValues(alpha: 0.78),
+          border: Border.all(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
           ),
-        ],
-      ),
-      child: Padding(
-        padding: padding ?? const EdgeInsets.all(16),
-        child: child,
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              blurRadius: 48,
+              offset: const Offset(0, 26),
+              color: theme.colorScheme.primary.withValues(alpha: 0.12),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: padding ?? const EdgeInsets.all(16),
+          child: child,
+        ),
       ),
     );
   }
 }
 
-class _MetricChip extends StatelessWidget {
-  const _MetricChip({required this.icon, required this.label});
+class _BrandLogoCard extends StatelessWidget {
+  const _BrandLogoCard({
+    required this.vertical,
+    required this.mobileCompact,
+    required this.selectedTitle,
+    required this.feedCount,
+    required this.unreadCount,
+  });
 
-  final IconData icon;
-  final String label;
+  final bool vertical;
+  final bool mobileCompact;
+  final String selectedTitle;
+  final int feedCount;
+  final int unreadCount;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    const lightBlue = Color(0xFFCFE3F4);
+    final background = theme.brightness == Brightness.dark
+        ? const Color(0xFF6F96B3)
+        : lightBlue;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: theme.colorScheme.onSurface.withOpacity(0.06),
+      constraints: BoxConstraints(
+        minWidth: vertical ? 0 : (mobileCompact ? 58 : 180),
+        maxWidth: vertical ? 72 : (mobileCompact ? 64 : 220),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 10),
-          Text(label),
+      padding: EdgeInsets.symmetric(
+        horizontal: vertical ? 8 : (mobileCompact ? 6 : 12),
+        vertical: vertical ? 12 : (mobileCompact ? 7 : 10),
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(mobileCompact ? 18 : 20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[background, background.withValues(alpha: 0.92)],
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+            color: background.withValues(alpha: 0.32),
+          ),
         ],
       ),
+      child: vertical
+          ? Column(
+              children: <Widget>[
+                const _RssNewsHubLogo(compact: true),
+                const SizedBox(height: 10),
+                Text(
+                  '$feedCount',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  'feed',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                if (unreadCount > 0) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                    child: Text(
+                      '$unreadCount moi',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            )
+          : mobileCompact
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const _RssNewsHubLogo(compact: true, mobileMini: true),
+                if (unreadCount > 0) ...<Widget>[
+                  const SizedBox(height: 4),
+                  Text(
+                    '$unreadCount',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ] else ...<Widget>[
+                  const SizedBox(height: 4),
+                  Text(
+                    '$feedCount',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const _RssNewsHubLogo(compact: false),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'RSS NEWS HUB',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        selectedTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.95),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        unreadCount > 0
+                            ? '$feedCount feed • $unreadCount moi'
+                            : '$feedCount feed',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.88),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
     );
+  }
+}
+
+class _RssNewsHubLogo extends StatelessWidget {
+  const _RssNewsHubLogo({required this.compact, this.mobileMini = false});
+
+  final bool compact;
+  final bool mobileMini;
+
+  @override
+  Widget build(BuildContext context) {
+    final markSize = mobileMini ? 28.0 : (compact ? 42.0 : 48.0);
+    final bookSize = mobileMini ? 18.0 : (compact ? 26.0 : 30.0);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        SizedBox(
+          width: markSize,
+          height: markSize,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: <Widget>[
+              Positioned(
+                top: 0,
+                child: SizedBox(
+                  width: markSize,
+                  height: markSize * 0.55,
+                  child: const CustomPaint(
+                    painter: _RssSignalPainter(color: Colors.white),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: markSize * 0.3,
+                child: Container(
+                  width: compact ? 8 : 10,
+                  height: compact ? 8 : 10,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                child: Icon(
+                  Icons.auto_stories_outlined,
+                  size: bookSize,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!mobileMini) ...<Widget>[
+          const SizedBox(height: 6),
+          Text(
+            compact ? 'RSS HUB' : 'RSS',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ],
+        if (!compact && !mobileMini)
+          Text(
+            'NEWS HUB',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.92),
+              letterSpacing: 1.0,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _RssSignalPainter extends CustomPainter {
+  const _RssSignalPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final strokeWidth = size.width * 0.11;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final center = Offset(size.width / 2, size.height * 0.92);
+    final outer = Rect.fromCircle(center: center, radius: size.width * 0.34);
+    final inner = Rect.fromCircle(center: center, radius: size.width * 0.2);
+
+    canvas.drawArc(outer, 4.02, 1.38, false, paint);
+    canvas.drawArc(inner, 4.0, 1.42, false, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RssSignalPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }
 
@@ -1208,45 +1613,52 @@ class _FeedSelectorTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
+    return Material(
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Ink(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: isActive
-              ? theme.colorScheme.primary.withOpacity(0.14)
-              : theme.colorScheme.onSurface.withOpacity(0.04),
-          border: Border.all(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
             color: isActive
-                ? theme.colorScheme.primary.withOpacity(0.3)
-                : theme.colorScheme.onSurface.withOpacity(0.06),
-          ),
-        ),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.66),
-                    ),
-                  ),
-                ],
-              ),
+                ? theme.colorScheme.primary.withValues(alpha: 0.14)
+                : theme.colorScheme.onSurface.withValues(alpha: 0.04),
+            border: Border.all(
+              color: isActive
+                  ? theme.colorScheme.primary.withValues(alpha: 0.3)
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.06),
             ),
-            const SizedBox(width: 12),
-            Text(trailing, style: theme.textTheme.titleSmall),
-            if (menu != null) ...<Widget>[const SizedBox(width: 4), menu!],
-          ],
+          ),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(title, style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.66,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(trailing, style: theme.textTheme.titleSmall),
+              if (menu != null) ...<Widget>[const SizedBox(width: 4), menu!],
+            ],
+          ),
         ),
       ),
     );
@@ -1276,7 +1688,7 @@ class _FilterChipButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           color: active
               ? theme.colorScheme.primary
-              : theme.colorScheme.onSurface.withOpacity(0.04),
+              : theme.colorScheme.onSurface.withValues(alpha: 0.04),
         ),
         child: Text(
           label,
@@ -1337,11 +1749,11 @@ class _ArticleCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          color: theme.colorScheme.onSurface.withOpacity(0.04),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
           border: Border.all(
             color: unread
-                ? theme.colorScheme.secondary.withOpacity(0.35)
-                : theme.colorScheme.onSurface.withOpacity(0.06),
+                ? theme.colorScheme.secondary.withValues(alpha: 0.35)
+                : theme.colorScheme.onSurface.withValues(alpha: 0.06),
           ),
         ),
         child: Row(
@@ -1358,23 +1770,32 @@ class _ArticleCard extends StatelessWidget {
                           article.feedTitle,
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: theme.colorScheme.primary,
+                            fontSize: 14,
                           ),
                         ),
                       ),
                       Text(
                         _friendlyDate(article.publishedAt),
-                        style: theme.textTheme.titleSmall,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Text(article.title, style: theme.textTheme.headlineSmall),
+                  Text(
+                    article.title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   Text(
                     article.teaser,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge?.copyWith(height: 1.45),
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
                   ),
                 ],
               ),
@@ -1421,7 +1842,7 @@ class _CompactArticleTile extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: theme.colorScheme.onSurface.withOpacity(0.04),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
         ),
         child: Row(
           children: <Widget>[
@@ -1432,7 +1853,7 @@ class _CompactArticleTile extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: unread
                     ? theme.colorScheme.secondary
-                    : theme.colorScheme.onSurface.withOpacity(0.18),
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.18),
               ),
             ),
             const SizedBox(width: 12),
@@ -1450,7 +1871,9 @@ class _CompactArticleTile extends StatelessWidget {
                   Text(
                     '${article.feedTitle} • ${_friendlyDate(article.publishedAt)}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.62),
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.62,
+                      ),
                     ),
                   ),
                 ],
@@ -1490,8 +1913,8 @@ class _SpotlightCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: <Color>[
-              theme.colorScheme.primary.withOpacity(0.16),
-              theme.colorScheme.secondary.withOpacity(0.12),
+              theme.colorScheme.primary.withValues(alpha: 0.16),
+              theme.colorScheme.secondary.withValues(alpha: 0.12),
             ],
           ),
         ),
@@ -1510,19 +1933,35 @@ class _SpotlightCard extends StatelessWidget {
                     ),
                   ),
                 if (unread) const SizedBox(width: 10),
-                Text(article.feedTitle, style: theme.textTheme.titleMedium),
+                Text(
+                  article.feedTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const Spacer(),
-                Text(_friendlyDate(article.publishedAt)),
+                Text(
+                  _friendlyDate(article.publishedAt),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
-            Text(article.title, style: theme.textTheme.headlineMedium),
+            Text(
+              article.title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.18,
+              ),
+            ),
             const SizedBox(height: 12),
             Text(
               article.teaser,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
             ),
             const SizedBox(height: 18),
             if (article.imageUrl != null)
@@ -1574,7 +2013,7 @@ class _HeadlineTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
-          color: theme.colorScheme.onSurface.withOpacity(0.03),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.03),
         ),
         child: Row(
           children: <Widget>[
@@ -1585,7 +2024,7 @@ class _HeadlineTile extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: unread
                     ? theme.colorScheme.secondary
-                    : theme.colorScheme.onSurface.withOpacity(0.18),
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.18),
               ),
             ),
             const SizedBox(width: 14),
@@ -1598,7 +2037,7 @@ class _HeadlineTile extends StatelessWidget {
                   Text(
                     '${article.feedTitle} • ${_friendlyDate(article.publishedAt)}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -1621,5 +2060,57 @@ String _friendlyDate(DateTime dateTime) {
       local.day == now.day) {
     return 'Hom nay $hh:$mm';
   }
-  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')} $hh:$mm';
+  final year = local.year == now.year ? '' : '/${local.year}';
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}$year $hh:$mm';
+}
+
+bool _isKnownIframeBlockedHost(String rawUrl) {
+  final host = Uri.tryParse(rawUrl)?.host.toLowerCase();
+  if (host == null || host.isEmpty) {
+    return false;
+  }
+  return host == 'vnexpress.net' || host.endsWith('.vnexpress.net');
+}
+
+String? _buildOverlayReaderUrl(String rawUrl) {
+  final uri = Uri.tryParse(rawUrl);
+  if (uri == null || uri.host.isEmpty) {
+    return null;
+  }
+  if (_isKnownIframeBlockedHost(rawUrl)) {
+    return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(rawUrl)}';
+  }
+  return rawUrl;
+}
+
+List<DropdownMenuItem<int>> _buildRefreshIntervalItems(int currentMinutes) {
+  final values = <int>{5, 15, 30, 60, 180, 360, 720, 1440, currentMinutes}
+    ..removeWhere((value) => value <= 0);
+  final sorted = values.toList()..sort();
+  return sorted
+      .map(
+        (minutes) => DropdownMenuItem<int>(
+          value: minutes,
+          child: Text(_formatRefreshInterval(Duration(minutes: minutes))),
+        ),
+      )
+      .toList();
+}
+
+String _formatRefreshInterval(Duration duration) {
+  final minutes = duration.inMinutes;
+  if (minutes < 60) {
+    return 'Moi $minutes phut';
+  }
+  if (minutes % (24 * 60) == 0) {
+    final days = minutes ~/ (24 * 60);
+    return days == 1 ? 'Moi 1 ngay' : 'Moi $days ngay';
+  }
+  if (minutes % 60 == 0) {
+    final hours = minutes ~/ 60;
+    return hours == 1 ? 'Moi 1 gio' : 'Moi $hours gio';
+  }
+  final hours = minutes ~/ 60;
+  final remainMinutes = minutes % 60;
+  return 'Moi ${hours}g ${remainMinutes}p';
 }
