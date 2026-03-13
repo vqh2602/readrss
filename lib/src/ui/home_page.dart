@@ -634,13 +634,6 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
   Future<void> _showControlsSheet(BuildContext context) async {
     final theme = Theme.of(context);
     final screenSize = MediaQuery.sizeOf(context);
-    final panelChildren = <Widget>[
-      _buildFeedPanel(context),
-      const SizedBox(height: 16),
-      _buildControlsPanel(context),
-      const SizedBox(height: 16),
-      _buildRecentPanel(context),
-    ];
 
     if (screenSize.width >= 1160) {
       final panelWidth = (screenSize.width * 0.28).clamp(320.0, 380.0);
@@ -656,7 +649,19 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 24, 24),
                 child: SizedBox(
                   width: panelWidth,
-                  child: ListView(shrinkWrap: true, children: panelChildren),
+                  height: screenSize.height * 0.9,
+                  child: Material(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(28),
+                    clipBehavior: Clip.antiAlias,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: _buildControlsSheetContent(
+                        dialogContext,
+                        onClose: () => Navigator.of(dialogContext).pop(),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -670,18 +675,69 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      showDragHandle: true,
       builder: (context) {
         return Padding(
           padding: const EdgeInsets.all(16),
-          child: Material(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(28),
-            clipBehavior: Clip.antiAlias,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: ListView(shrinkWrap: true, children: panelChildren),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: screenSize.height * 0.88),
+            child: Material(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(28),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: _buildControlsSheetContent(
+                  context,
+                  onClose: () => Navigator.of(context).pop(),
+                ),
+              ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildControlsSheetContent(
+    BuildContext context, {
+    required VoidCallback onClose,
+  }) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        final panelChildren = <Widget>[
+          _buildFeedPanel(context),
+          const SizedBox(height: 16),
+          _buildControlsPanel(context),
+          const SizedBox(height: 16),
+          _buildRecentPanel(context),
+        ];
+        return Column(
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'Thiết đặt',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Đóng',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(child: ListView(children: panelChildren)),
+          ],
         );
       },
     );
@@ -1158,11 +1214,13 @@ class ArticleReaderDialog extends StatelessWidget {
     final hasLink = article.link.trim().isNotEmpty;
     final readerUrl = hasLink ? _buildOverlayReaderUrl(article.link) : null;
     final canEmbedWeb = readerUrl != null;
-    final body = article.content.isNotEmpty
-        ? article.content
-        : (article.summary.isNotEmpty
-              ? article.summary
-              : 'Feed này không cung cấp nội dung đầy đủ. Hãy mở bài gốc để xem thêm.');
+    final summary = article.summary.trim();
+    final content = article.content.trim();
+    final hasSummary = summary.isNotEmpty;
+    final hasContent = content.isNotEmpty;
+    final showDetailSection =
+        hasContent &&
+        _normalizeReaderText(content) != _normalizeReaderText(summary);
 
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
@@ -1247,12 +1305,58 @@ class ArticleReaderDialog extends StatelessWidget {
                               ),
                             ),
                           if (hasLink) const SizedBox(height: 14),
-                          SelectableText(
-                            body,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              height: 1.7,
+                          if (article.imageUrl != null) ...<Widget>[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(22),
+                              child: Image.network(
+                                article.imageUrl!,
+                                height: 220,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const SizedBox.shrink(),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (hasSummary) ...<Widget>[
+                            Text(
+                              'Tóm tắt',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SelectableText(
+                              summary,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                height: 1.7,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                          ],
+                          if (showDetailSection) ...<Widget>[
+                            Text(
+                              'Chi tiết',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SelectableText(
+                              content,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                height: 1.7,
+                              ),
+                            ),
+                          ],
+                          if (!hasSummary && !hasContent)
+                            SelectableText(
+                              'Feed này không cung cấp nội dung đầy đủ. Hãy mở bài gốc để xem thêm.',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                height: 1.7,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -2061,6 +2165,10 @@ bool _isKnownIframeBlockedHost(String rawUrl) {
     return false;
   }
   return host == 'vnexpress.net' || host.endsWith('.vnexpress.net');
+}
+
+String _normalizeReaderText(String value) {
+  return value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 }
 
 String? _buildOverlayReaderUrl(String rawUrl) {
