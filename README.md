@@ -15,6 +15,6 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
-build web --base-href /terrarium_data.github.io/trutien/ --release 
+flutter build web --base-href /terrarium_data.github.io/tintuc/ --release 
 
 flutter build apk --release

@@ -21,6 +21,31 @@ enum FeedDisplayMode {
   }
 }
 
+enum AppThemePreset {
+  ocean,
+  sunset,
+  forest,
+  sakura,
+  sand,
+  slate;
+
+  String get label => switch (this) {
+    AppThemePreset.ocean => 'Ocean',
+    AppThemePreset.sunset => 'Sunset',
+    AppThemePreset.forest => 'Forest',
+    AppThemePreset.sakura => 'Sakura',
+    AppThemePreset.sand => 'Sand',
+    AppThemePreset.slate => 'Slate',
+  };
+
+  static AppThemePreset fromStorage(String? value) {
+    return AppThemePreset.values.firstWhere(
+      (preset) => preset.name == value,
+      orElse: () => AppThemePreset.ocean,
+    );
+  }
+}
+
 class FeedSource {
   const FeedSource({
     required this.id,
@@ -175,6 +200,7 @@ class NewsItem {
 class ReaderSettings {
   const ReaderSettings({
     this.themeMode = ThemeMode.system,
+    this.themePreset = AppThemePreset.ocean,
     this.displayMode = FeedDisplayMode.cards,
     this.notificationsEnabled = false,
     this.adBlockEnabled = true,
@@ -182,6 +208,7 @@ class ReaderSettings {
   });
 
   final ThemeMode themeMode;
+  final AppThemePreset themePreset;
   final FeedDisplayMode displayMode;
   final bool notificationsEnabled;
   final bool adBlockEnabled;
@@ -189,6 +216,7 @@ class ReaderSettings {
 
   ReaderSettings copyWith({
     ThemeMode? themeMode,
+    AppThemePreset? themePreset,
     FeedDisplayMode? displayMode,
     bool? notificationsEnabled,
     bool? adBlockEnabled,
@@ -196,6 +224,7 @@ class ReaderSettings {
   }) {
     return ReaderSettings(
       themeMode: themeMode ?? this.themeMode,
+      themePreset: themePreset ?? this.themePreset,
       displayMode: displayMode ?? this.displayMode,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       adBlockEnabled: adBlockEnabled ?? this.adBlockEnabled,
@@ -206,6 +235,7 @@ class ReaderSettings {
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'themeMode': themeMode.name,
+      'themePreset': themePreset.name,
       'displayMode': displayMode.name,
       'notificationsEnabled': notificationsEnabled,
       'adBlockEnabled': adBlockEnabled,
@@ -222,6 +252,7 @@ class ReaderSettings {
         (mode) => mode.name == json['themeMode'],
         orElse: () => ThemeMode.system,
       ),
+      themePreset: AppThemePreset.fromStorage(json['themePreset'] as String?),
       displayMode: FeedDisplayMode.fromStorage(json['displayMode'] as String?),
       notificationsEnabled: json['notificationsEnabled'] as bool? ?? false,
       adBlockEnabled: json['adBlockEnabled'] as bool? ?? true,

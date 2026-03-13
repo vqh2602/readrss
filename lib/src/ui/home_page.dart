@@ -129,6 +129,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
       ),
       child: vertical
           ? Column(
+              spacing: 8,
               children: <Widget>[
                 summary,
                 const SizedBox(height: 8),
@@ -140,6 +141,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
               ],
             )
           : Row(
+              spacing: 8,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 summary,
@@ -388,6 +390,38 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
             onSelectionChanged: (selection) {
               controller.setThemeMode(selection.first);
             },
+          ),
+          const SizedBox(height: 14),
+          Text('Bảng màu', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: AppThemePreset.values.map((preset) {
+              final isActive = controller.settings.themePreset == preset;
+              return ChoiceChip(
+                selected: isActive,
+                showCheckmark: false,
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _themePresetColor(preset, theme.brightness),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(preset.label),
+                  ],
+                ),
+                onSelected: (_) {
+                  controller.setThemePreset(preset);
+                },
+              );
+            }).toList(),
           ),
           const SizedBox(height: 18),
           Wrap(
@@ -2194,6 +2228,24 @@ List<DropdownMenuItem<int>> _buildRefreshIntervalItems(int currentMinutes) {
         ),
       )
       .toList();
+}
+
+Color _themePresetColor(AppThemePreset preset, Brightness brightness) {
+  final isDark = brightness == Brightness.dark;
+  return switch (preset) {
+    AppThemePreset.ocean =>
+      isDark ? const Color(0xFF74F2CE) : const Color(0xFF116A7B),
+    AppThemePreset.sunset =>
+      isDark ? const Color(0xFFFF9F80) : const Color(0xFFB85042),
+    AppThemePreset.forest =>
+      isDark ? const Color(0xFF8FD694) : const Color(0xFF2E7D32),
+    AppThemePreset.sakura =>
+      isDark ? const Color(0xFFFF8AB3) : const Color(0xFFC2185B),
+    AppThemePreset.sand =>
+      isDark ? const Color(0xFFD7B59A) : const Color(0xFF8D6E63),
+    AppThemePreset.slate =>
+      isDark ? const Color(0xFFB0BEC5) : const Color(0xFF455A64),
+  };
 }
 
 String _formatRefreshInterval(Duration duration) {

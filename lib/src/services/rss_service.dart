@@ -12,7 +12,6 @@ import '../models.dart';
 class RssService {
   RssService({http.Client? client}) : _client = client ?? http.Client();
 
-  static const _maxItemsPerFeed = 80;
   static const _requestTimeout = Duration(seconds: 14);
   static final _rfc822Formats = <DateFormat>[
     DateFormat('EEE, dd MMM yyyy HH:mm:ss', 'en_US'),
@@ -92,9 +91,17 @@ class RssService {
   }) async {
     final normalizedUri = _normalizeUri(source.url);
     try {
-      final xml = await _downloadFeedXml(normalizedUri);
+      final payload = await _downloadFeedXml(normalizedUri);
+      final jsonFeedResult = _tryParseJsonFeedPayload(
+        payload: payload,
+        source: source,
+        adBlockEnabled: adBlockEnabled,
+      );
+      if (jsonFeedResult != null) {
+        return jsonFeedResult;
+      }
       return _parseFeed(
-        xml: xml,
+        xml: payload,
         source: source,
         adBlockEnabled: adBlockEnabled,
       );
@@ -145,10 +152,13 @@ class RssService {
               },
             )
             .timeout(_requestTimeout);
-        if (response.statusCode >= 200 &&
-            response.statusCode < 300 &&
-            response.body.trim().isNotEmpty) {
-          return response.body;
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final body = _resolveXmlPayload(target, response.body);
+          if (body.isNotEmpty) {
+            return body;
+          }
+          lastError = 'Dữ liệu rỗng @ $target';
+          continue;
         }
         lastError = 'HTTP ${response.statusCode} @ $target';
       } catch (error) {
@@ -184,9 +194,36 @@ class RssService {
     final encoded = Uri.encodeComponent(source.toString());
     return <Uri>[
       source,
+      Uri.parse(
+        'https://api.allorigins.win/get?disableCache=true&url=$encoded',
+      ),
       Uri.parse('https://api.allorigins.win/raw?url=$encoded'),
       Uri.parse('https://api.codetabs.com/v1/proxy/?quest=$encoded'),
     ];
+  }
+
+  String _resolveXmlPayload(Uri target, String body) {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+
+    final isAllOriginsGet =
+        target.host == 'api.allorigins.win' && target.path.endsWith('/get');
+    if (!isAllOriginsGet) {
+      return trimmed;
+    }
+
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is! Map<String, dynamic>) {
+        return '';
+      }
+      final contents = decoded['contents']?.toString().trim() ?? '';
+      return contents;
+    } catch (_) {
+      return '';
+    }
   }
 
   FeedRefreshResult _parseFeed({
@@ -275,6 +312,72 @@ class RssService {
     );
   }
 
+  FeedRefreshResult? _tryParseJsonFeedPayload({
+    required String payload,
+    required FeedSource source,
+    required bool adBlockEnabled,
+  }) {
+    final trimmed = payload.trim();
+    if (trimmed.isEmpty ||
+        (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      final version = decoded['version']?.toString().toLowerCase() ?? '';
+      final isJsonFeed =
+          version.contains('jsonfeed.org/version') ||
+          decoded.containsKey('items');
+      if (!isJsonFeed) {
+        return null;
+      }
+      return _parseJsonFeed(
+        jsonFeed: decoded,
+        source: source,
+        adBlockEnabled: adBlockEnabled,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  FeedRefreshResult _parseJsonFeed({
+    required Map<String, dynamic> jsonFeed,
+    required FeedSource source,
+    required bool adBlockEnabled,
+  }) {
+    final resolvedTitle =
+        jsonFeed['title']?.toString().trim().isNotEmpty == true
+        ? jsonFeed['title'].toString().trim()
+        : source.title;
+    final itemsJson = jsonFeed['items'] as List<dynamic>? ?? const <dynamic>[];
+    final items =
+        itemsJson
+            .whereType<Map<dynamic, dynamic>>()
+            .map(
+              (item) => _parseJsonFeedItem(
+                Map<String, dynamic>.from(item),
+                source: source,
+                feedTitle: resolvedTitle,
+                adBlockEnabled: adBlockEnabled,
+              ),
+            )
+            .whereType<NewsItem>()
+            .toList()
+          ..sort(
+            (left, right) => right.publishedAt.compareTo(left.publishedAt),
+          );
+
+    return _finalizeFeedResult(
+      source: source,
+      resolvedTitle: resolvedTitle,
+      items: items,
+    );
+  }
+
   FeedRefreshResult _parseAtom(
     XmlElement root, {
     required FeedSource source,
@@ -311,8 +414,7 @@ class RssService {
     required String resolvedTitle,
     required List<NewsItem> items,
   }) {
-    final trimmedItems = items.take(_maxItemsPerFeed).toList();
-    if (trimmedItems.isEmpty) {
+    if (items.isEmpty) {
       throw const FeedLoadException(
         'Nguồn RSS không trả về bài viết nào hoặc proxy trả dữ liệu rỗng.',
       );
@@ -320,7 +422,7 @@ class RssService {
     return FeedRefreshResult(
       source: source,
       resolvedTitle: resolvedTitle,
-      items: trimmedItems,
+      items: List<NewsItem>.from(items),
       fetchedAt: DateTime.now(),
     );
   }
@@ -451,6 +553,58 @@ class RssService {
       summary: _sanitizeHtml(descriptionHtml, adBlockEnabled: adBlockEnabled),
       content: _sanitizeHtml(contentHtml, adBlockEnabled: adBlockEnabled),
       author: item['author']?.toString(),
+      imageUrl: imageUrl,
+    );
+  }
+
+  NewsItem? _parseJsonFeedItem(
+    Map<String, dynamic> item, {
+    required FeedSource source,
+    required String feedTitle,
+    required bool adBlockEnabled,
+  }) {
+    final title = item['title']?.toString().trim().isNotEmpty == true
+        ? item['title'].toString().trim()
+        : 'Không có tiêu đề';
+    final link = item['url']?.toString().trim().isNotEmpty == true
+        ? item['url'].toString().trim()
+        : (item['external_url']?.toString().trim().isNotEmpty == true
+              ? item['external_url'].toString().trim()
+              : source.url);
+    if (link.isEmpty) {
+      return null;
+    }
+
+    final contentHtml = item['content_html']?.toString() ?? '';
+    final contentText = item['content_text']?.toString() ?? '';
+    final summaryHtml = contentHtml.isNotEmpty ? contentHtml : contentText;
+    final publishedAt =
+        _parseDate(item['date_published']?.toString()) ??
+        _parseDate(item['date_modified']?.toString()) ??
+        DateTime.now();
+    final imageUrl = item['image']?.toString().trim().isNotEmpty == true
+        ? item['image'].toString().trim()
+        : _extractJsonFeedAttachmentImage(item);
+
+    return NewsItem(
+      id: NewsItem.createId(
+        feedId: source.id,
+        guid: item['id']?.toString() ?? link,
+        link: link,
+        title: title,
+        publishedAt: publishedAt,
+      ),
+      feedId: source.id,
+      feedTitle: feedTitle,
+      title: title,
+      link: link,
+      publishedAt: publishedAt,
+      summary: _sanitizeHtml(summaryHtml, adBlockEnabled: adBlockEnabled),
+      content: _sanitizeHtml(
+        contentHtml.isNotEmpty ? contentHtml : contentText,
+        adBlockEnabled: adBlockEnabled,
+      ),
+      author: _extractJsonFeedAuthor(item),
       imageUrl: imageUrl,
     );
   }
@@ -700,6 +854,41 @@ class RssService {
       if (url != null && url.trim().isNotEmpty) {
         return url.trim();
       }
+    }
+    return null;
+  }
+
+  String? _extractJsonFeedAttachmentImage(Map<String, dynamic> item) {
+    final attachments =
+        item['attachments'] as List<dynamic>? ?? const <dynamic>[];
+    for (final attachment in attachments) {
+      if (attachment is! Map<dynamic, dynamic>) {
+        continue;
+      }
+      final map = Map<String, dynamic>.from(attachment);
+      final url = map['url']?.toString().trim();
+      if (url != null && url.isNotEmpty) {
+        return url;
+      }
+    }
+    return null;
+  }
+
+  String? _extractJsonFeedAuthor(Map<String, dynamic> item) {
+    final authors = item['authors'] as List<dynamic>? ?? const <dynamic>[];
+    for (final author in authors) {
+      if (author is! Map<dynamic, dynamic>) {
+        continue;
+      }
+      final map = Map<String, dynamic>.from(author);
+      final name = map['name']?.toString().trim();
+      if (name != null && name.isNotEmpty) {
+        return name;
+      }
+    }
+    final singleAuthor = item['author']?.toString().trim();
+    if (singleAuthor != null && singleAuthor.isNotEmpty) {
+      return singleAuthor;
     }
     return null;
   }

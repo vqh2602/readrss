@@ -22,7 +22,10 @@ class RssController extends ChangeNotifier {
   }
 
   static const allFeedsId = '__all__';
-  static const _maxKnownIds = 500;
+  static const _maxKnownIds = 6000;
+  static const _maxCachedArticlesPerFeedInStorage = 200;
+  static const _maxKnownIdsInStorage = 4000;
+  static const _maxUnreadIdsInStorage = 2000;
 
   final BrowserBridge _browserBridge;
   final RssService _rssService;
@@ -227,29 +230,33 @@ class RssController extends ChangeNotifier {
     _isRefreshing = true;
     _lastStatus = 'Đang cập nhật tất cả nguồn...';
     notifyListeners();
+    try {
+      final updatedFeeds = <FeedSource>[];
+      final allNewItems = <NewsItem>[];
+      for (final feed in _feeds) {
+        updatedFeeds.add(
+          await _refreshSingleFeed(
+            feed,
+            isInitial: isInitial,
+            triggerNotifications: triggerNotifications,
+            newItemsAccumulator: allNewItems,
+          ),
+        );
+      }
 
-    final updatedFeeds = <FeedSource>[];
-    final allNewItems = <NewsItem>[];
-    for (final feed in _feeds) {
-      updatedFeeds.add(
-        await _refreshSingleFeed(
-          feed,
-          isInitial: isInitial,
-          triggerNotifications: triggerNotifications,
-          newItemsAccumulator: allNewItems,
-        ),
-      );
+      _feeds = updatedFeeds;
+      _lastRefreshAt = DateTime.now();
+      _lastStatus = allNewItems.isEmpty
+          ? 'Cập nhật xong, chưa có tin mới.'
+          : 'Cập nhật xong, có ${allNewItems.length} tin mới.';
+      _syncBadge();
+      await _persist();
+    } catch (error) {
+      _lastStatus = 'Có lỗi khi cập nhật feed: $error';
+    } finally {
+      _isRefreshing = false;
+      notifyListeners();
     }
-
-    _feeds = updatedFeeds;
-    _isRefreshing = false;
-    _lastRefreshAt = DateTime.now();
-    _lastStatus = allNewItems.isEmpty
-        ? 'Cập nhật xong, chưa có tin mới.'
-        : 'Cập nhật xong, có ${allNewItems.length} tin mới.';
-    _syncBadge();
-    await _persist();
-    notifyListeners();
   }
 
   Future<void> refreshFeed(
@@ -263,23 +270,27 @@ class RssController extends ChangeNotifier {
     }
     _isRefreshing = true;
     notifyListeners();
+    try {
+      final newItems = <NewsItem>[];
+      _feeds[index] = await _refreshSingleFeed(
+        _feeds[index],
+        isInitial: isInitial,
+        triggerNotifications: triggerNotifications,
+        newItemsAccumulator: newItems,
+      );
 
-    final newItems = <NewsItem>[];
-    _feeds[index] = await _refreshSingleFeed(
-      _feeds[index],
-      isInitial: isInitial,
-      triggerNotifications: triggerNotifications,
-      newItemsAccumulator: newItems,
-    );
-
-    _isRefreshing = false;
-    _lastRefreshAt = DateTime.now();
-    _lastStatus = newItems.isEmpty
-        ? 'Không có tin mới từ ${_feeds[index].title}.'
-        : '${_feeds[index].title} có ${newItems.length} tin mới.';
-    _syncBadge();
-    await _persist();
-    notifyListeners();
+      _lastRefreshAt = DateTime.now();
+      _lastStatus = newItems.isEmpty
+          ? 'Không có tin mới từ ${_feeds[index].title}.'
+          : '${_feeds[index].title} có ${newItems.length} tin mới.';
+      _syncBadge();
+      await _persist();
+    } catch (error) {
+      _lastStatus = 'Có lỗi khi làm mới feed: $error';
+    } finally {
+      _isRefreshing = false;
+      notifyListeners();
+    }
   }
 
   Future<String> requestNotificationPermission() async {
@@ -311,6 +322,12 @@ class RssController extends ChangeNotifier {
 
   Future<void> setThemeMode(ThemeMode mode) async {
     _settings = _settings.copyWith(themeMode: mode);
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> setThemePreset(AppThemePreset preset) async {
+    _settings = _settings.copyWith(themePreset: preset);
     await _persist();
     notifyListeners();
   }
@@ -456,34 +473,38 @@ class RssController extends ChangeNotifier {
     if (dueFeedIds.isEmpty) {
       return;
     }
-
     _isRefreshing = true;
     notifyListeners();
-    final updatedFeeds = <FeedSource>[];
-    final allNewItems = <NewsItem>[];
-    for (final feed in _feeds) {
-      if (dueFeedIds.contains(feed.id)) {
-        updatedFeeds.add(
-          await _refreshSingleFeed(
-            feed,
-            isInitial: false,
-            triggerNotifications: true,
-            newItemsAccumulator: allNewItems,
-          ),
-        );
-      } else {
-        updatedFeeds.add(feed);
+    try {
+      final updatedFeeds = <FeedSource>[];
+      final allNewItems = <NewsItem>[];
+      for (final feed in _feeds) {
+        if (dueFeedIds.contains(feed.id)) {
+          updatedFeeds.add(
+            await _refreshSingleFeed(
+              feed,
+              isInitial: false,
+              triggerNotifications: true,
+              newItemsAccumulator: allNewItems,
+            ),
+          );
+        } else {
+          updatedFeeds.add(feed);
+        }
       }
+      _feeds = updatedFeeds;
+      _lastRefreshAt = now;
+      _lastStatus = allNewItems.isEmpty
+          ? 'Auto refresh hoàn tất.'
+          : 'Auto refresh có ${allNewItems.length} tin mới.';
+      _syncBadge();
+      await _persist();
+    } catch (error) {
+      _lastStatus = 'Auto refresh gặp lỗi: $error';
+    } finally {
+      _isRefreshing = false;
+      notifyListeners();
     }
-    _feeds = updatedFeeds;
-    _isRefreshing = false;
-    _lastRefreshAt = now;
-    _lastStatus = allNewItems.isEmpty
-        ? 'Auto refresh hoàn tất.'
-        : 'Auto refresh có ${allNewItems.length} tin mới.';
-    _syncBadge();
-    await _persist();
-    notifyListeners();
   }
 
   PersistedState _buildPersistedState() {
@@ -526,8 +547,43 @@ class RssController extends ChangeNotifier {
     return base64Url.encode(utf8.encode(raw)).replaceAll('=', '');
   }
 
-  Future<void> _persist() {
-    return _storageService.save(_buildPersistedState());
+  Future<void> _persist() async {
+    try {
+      await _storageService.save(_buildPersistedStateForStorage());
+    } catch (_) {
+      await _storageService.save(
+        PersistedState(
+          feeds: _feeds,
+          settings: _settings,
+          knownArticleIds: const <String>[],
+          unreadArticleIds: const <String>[],
+          cachedArticlesByFeed: const <String, List<NewsItem>>{},
+        ),
+      );
+    }
+  }
+
+  PersistedState _buildPersistedStateForStorage() {
+    final knownIds = _knownArticleIds.take(_maxKnownIdsInStorage).toList();
+    final knownSet = knownIds.toSet();
+    final unreadIds = _unreadArticleIds
+        .where(knownSet.contains)
+        .take(_maxUnreadIdsInStorage)
+        .toList();
+    final cachedByFeed = _itemsByFeed.map(
+      (feedId, items) => MapEntry(
+        feedId,
+        List<NewsItem>.from(items.take(_maxCachedArticlesPerFeedInStorage)),
+      ),
+    );
+
+    return PersistedState(
+      feeds: _feeds,
+      settings: _settings,
+      knownArticleIds: knownIds,
+      unreadArticleIds: unreadIds,
+      cachedArticlesByFeed: cachedByFeed,
+    );
   }
 
   @override

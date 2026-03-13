@@ -139,7 +139,7 @@ class _BrowserBridgeWeb implements BrowserBridge {
     final created = web.HTMLLinkElement()
       ..rel = 'icon'
       ..type = 'image/png'
-      ..href = 'favicon.png';
+      ..href = 'favicon.png?v=20260313';
     web.document.head?.append(created);
     return created;
   }
