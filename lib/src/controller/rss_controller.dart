@@ -130,7 +130,7 @@ class RssController extends ChangeNotifier {
       _knownArticleIds.clear();
       _unreadArticleIds.clear();
       _syncService.clearSyncFragment();
-      _lastStatus = 'Da nhap du lieu tu link dong bo.';
+      _lastStatus = 'Đã nhập dữ liệu từ link đồng bộ.';
       await _storageService.save(state);
     }
 
@@ -167,7 +167,7 @@ class RssController extends ChangeNotifier {
       (feed) => feed.url.toLowerCase() == normalizedUrl.toLowerCase(),
     );
     if (duplicate) {
-      throw StateError('Nguon RSS nay da ton tai.');
+      throw StateError('Nguồn RSS này đã tồn tại.');
     }
 
     final resolvedTitle = preview != null && preview.title.trim().isNotEmpty
@@ -185,7 +185,7 @@ class RssController extends ChangeNotifier {
     await _persist();
     notifyListeners();
     await refreshFeed(feed.id, isInitial: true, triggerNotifications: false);
-    return 'Da them nguon ${feed.title}.';
+    return 'Đã thêm nguồn ${feed.title}.';
   }
 
   Future<String> removeFeed(String feedId) async {
@@ -199,8 +199,8 @@ class RssController extends ChangeNotifier {
     await _persist();
     notifyListeners();
     return removed == null
-        ? 'Khong tim thay feed can xoa.'
-        : 'Da xoa nguon ${removed.title}.';
+        ? 'Không tìm thấy feed cần xóa.'
+        : 'Đã xóa nguồn ${removed.title}.';
   }
 
   Future<String> updateFeedRefreshInterval(
@@ -209,12 +209,12 @@ class RssController extends ChangeNotifier {
   ) async {
     final index = _feeds.indexWhere((feed) => feed.id == feedId);
     if (index == -1) {
-      throw StateError('Khong tim thay feed can cap nhat.');
+      throw StateError('Không tìm thấy feed cần cập nhật.');
     }
     _feeds[index] = _feeds[index].copyWith(refreshInterval: refreshInterval);
     await _persist();
     notifyListeners();
-    return 'Da cap nhat chu ky lam moi cho ${_feeds[index].title}.';
+    return 'Đã cập nhật chu kỳ làm mới cho ${_feeds[index].title}.';
   }
 
   Future<void> refreshAll({
@@ -225,7 +225,7 @@ class RssController extends ChangeNotifier {
       return;
     }
     _isRefreshing = true;
-    _lastStatus = 'Dang cap nhat tat ca nguon...';
+    _lastStatus = 'Đang cập nhật tất cả nguồn...';
     notifyListeners();
 
     final updatedFeeds = <FeedSource>[];
@@ -245,8 +245,8 @@ class RssController extends ChangeNotifier {
     _isRefreshing = false;
     _lastRefreshAt = DateTime.now();
     _lastStatus = allNewItems.isEmpty
-        ? 'Cap nhat xong, chua co tin moi.'
-        : 'Cap nhat xong, co ${allNewItems.length} tin moi.';
+        ? 'Cập nhật xong, chưa có tin mới.'
+        : 'Cập nhật xong, có ${allNewItems.length} tin mới.';
     _syncBadge();
     await _persist();
     notifyListeners();
@@ -275,8 +275,8 @@ class RssController extends ChangeNotifier {
     _isRefreshing = false;
     _lastRefreshAt = DateTime.now();
     _lastStatus = newItems.isEmpty
-        ? 'Khong co tin moi tu ${_feeds[index].title}.'
-        : '${_feeds[index].title} co ${newItems.length} tin moi.';
+        ? 'Không có tin mới từ ${_feeds[index].title}.'
+        : '${_feeds[index].title} có ${newItems.length} tin mới.';
     _syncBadge();
     await _persist();
     notifyListeners();
@@ -288,15 +288,15 @@ class RssController extends ChangeNotifier {
       _settings = _settings.copyWith(notificationsEnabled: true);
       await _persist();
       notifyListeners();
-      return 'Da cap quyen thong bao trinh duyet.';
+      return 'Đã cấp quyền thông báo trình duyệt.';
     }
     if (access == NotificationAccess.denied) {
       _settings = _settings.copyWith(notificationsEnabled: false);
       await _persist();
       notifyListeners();
-      throw StateError('Trinh duyet dang chan thong bao cho trang nay.');
+      throw StateError('Trình duyệt đang chặn thông báo cho trang này.');
     }
-    throw StateError('Trinh duyet khong ho tro hoac chua cap quyen thong bao.');
+    throw StateError('Trình duyệt không hỗ trợ hoặc chưa cấp quyền thông báo.');
   }
 
   Future<String> setNotificationsEnabled(bool enabled) async {
@@ -306,7 +306,7 @@ class RssController extends ChangeNotifier {
     _settings = _settings.copyWith(notificationsEnabled: enabled);
     await _persist();
     notifyListeners();
-    return enabled ? 'Da bat thong bao tin moi.' : 'Da tat thong bao tin moi.';
+    return enabled ? 'Đã bật thông báo tin mới.' : 'Đã tắt thông báo tin mới.';
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -352,7 +352,7 @@ class RssController extends ChangeNotifier {
   Future<String> importSyncLink(String rawLink) async {
     final snapshot = _syncService.parseSyncLink(rawLink);
     if (snapshot == null) {
-      throw const FormatException('Link dong bo khong hop le.');
+      throw const FormatException('Link đồng bộ không hợp lệ.');
     }
 
     final restored = snapshot.toPersistedState();
@@ -362,19 +362,19 @@ class RssController extends ChangeNotifier {
     _knownArticleIds.clear();
     _unreadArticleIds.clear();
     _selectedFeedId = allFeedsId;
-    _lastStatus = 'Da nhap ${_feeds.length} nguon tu link dong bo.';
+    _lastStatus = 'Đã nhập ${_feeds.length} nguồn từ link đồng bộ.';
     await _persist();
     notifyListeners();
 
     if (_feeds.isNotEmpty) {
       await refreshAll(isInitial: true, triggerNotifications: false);
     }
-    return 'Da nhap du lieu thanh cong.';
+    return 'Đã nhập dữ liệu thành công.';
   }
 
   Future<String> backupToDiscord() async {
     await _syncService.sendBackup(_buildPersistedState());
-    return 'Da gui ban sao luu len Discord webhook.';
+    return 'Đã gửi bản sao lưu lên Discord webhook.';
   }
 
   Future<FeedSource> _refreshSingleFeed(
@@ -479,8 +479,8 @@ class RssController extends ChangeNotifier {
     _isRefreshing = false;
     _lastRefreshAt = now;
     _lastStatus = allNewItems.isEmpty
-        ? 'Auto refresh hoan tat.'
-        : 'Auto refresh co ${allNewItems.length} tin moi.';
+        ? 'Auto refresh hoàn tất.'
+        : 'Auto refresh có ${allNewItems.length} tin mới.';
     _syncBadge();
     await _persist();
     notifyListeners();

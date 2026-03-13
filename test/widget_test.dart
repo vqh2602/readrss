@@ -14,7 +14,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Recent Feeds'), findsWidgets);
-    expect(find.textContaining('Them nguon'), findsWidgets);
+    expect(find.textContaining('Thêm nguồn'), findsWidgets);
     expect(find.byIcon(Icons.dashboard_customize_outlined), findsOneWidget);
   });
 }

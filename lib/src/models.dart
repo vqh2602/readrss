@@ -8,9 +8,9 @@ enum FeedDisplayMode {
   headlines;
 
   String get label => switch (this) {
-    FeedDisplayMode.cards => 'Danh sach',
+    FeedDisplayMode.cards => 'Danh sách',
     FeedDisplayMode.spotlight => 'Focus',
-    FeedDisplayMode.headlines => 'Tieu de',
+    FeedDisplayMode.headlines => 'Tiêu đề',
   };
 
   static FeedDisplayMode fromStorage(String? value) {

@@ -83,7 +83,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
   }
 
   Widget _buildQuickRail(BuildContext context, {required bool vertical}) {
-    final selectedTitle = controller.selectedFeed?.title ?? 'Tat ca';
+    final selectedTitle = controller.selectedFeed?.title ?? 'Tất cả';
     final unreadCount = controller.unreadCount;
     final feedCount = controller.feeds.length;
     final isMobileCompact = !vertical;
@@ -97,21 +97,21 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
     );
 
     final menuButton = Tooltip(
-      message: 'Feed va cai dat',
+      message: 'Feed và cài đặt',
       child: IconButton.filled(
         onPressed: () => _showControlsSheet(context),
         icon: const Icon(Icons.dashboard_customize_outlined),
       ),
     );
     final addButton = Tooltip(
-      message: 'Them feed',
+      message: 'Thêm feed',
       child: IconButton.filledTonal(
         onPressed: _showAddFeedDialog,
         icon: const Icon(Icons.add),
       ),
     );
     final refreshButton = Tooltip(
-      message: 'Lam moi',
+      message: 'Làm mới',
       child: IconButton.filledTonal(
         onPressed: controller.hasFeeds && !controller.isRefreshing
             ? () async {
@@ -182,15 +182,15 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
           const SizedBox(height: 16),
           _FeedSelectorTile(
             isActive: controller.selectedFeedId == RssController.allFeedsId,
-            title: 'Tat ca bai moi',
-            subtitle: 'Tong hop tat ca feed theo thoi gian moi nhat',
+            title: 'Tất cả bài mới',
+            subtitle: 'Tổng hợp tất cả feed theo thời gian mới nhất',
             trailing: '$allCount',
             onTap: () => controller.setSelectedFeed(RssController.allFeedsId),
           ),
           const SizedBox(height: 12),
           if (controller.feeds.isEmpty)
             Text(
-              'Chua co nguon RSS nao. Them nguon dau tien de bat dau.',
+              'Chưa có nguồn RSS nào. Thêm nguồn đầu tiên để bắt đầu.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
@@ -223,15 +223,15 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
                     itemBuilder: (context) => const <PopupMenuEntry<String>>[
                       PopupMenuItem<String>(
                         value: 'edit',
-                        child: Text('Sua chu ky lam moi'),
+                        child: Text('Sửa chu kỳ làm mới'),
                       ),
                       PopupMenuItem<String>(
                         value: 'refresh',
-                        child: Text('Lam moi feed'),
+                        child: Text('Làm mới feed'),
                       ),
                       PopupMenuItem<String>(
                         value: 'remove',
-                        child: Text('Xoa feed'),
+                        child: Text('Xóa feed'),
                       ),
                     ],
                   ),
@@ -326,7 +326,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            'Cai dat va dong bo',
+            'Cài đặt và đồng bộ',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -334,7 +334,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
           const SizedBox(height: 18),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Thong bao tin moi'),
+            title: const Text('Thông báo tin mới'),
             subtitle: Text(controller.notificationAccess.label),
             value: controller.settings.notificationsEnabled,
             onChanged: (value) {
@@ -343,8 +343,8 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('AdBlock khi doc'),
-            subtitle: const Text('Loai bot iframe, script va khung quang cao.'),
+            title: const Text('AdBlock khi đọc'),
+            subtitle: const Text('Loại bỏ iframe, script và khung quảng cáo.'),
             value: controller.settings.adBlockEnabled,
             onChanged: (value) {
               controller.setAdBlockEnabled(value);
@@ -354,7 +354,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
             contentPadding: EdgeInsets.zero,
             title: const Text('Auto refresh'),
             subtitle: const Text(
-              'Tu dong kiem tra feed theo chu ky cua tung nguon.',
+              'Tự động kiểm tra feed theo chu kỳ của từng nguồn.',
             ),
             value: controller.settings.autoRefreshEnabled,
             onChanged: (value) {
@@ -362,7 +362,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
             },
           ),
           const SizedBox(height: 12),
-          Text('Giao dien', style: theme.textTheme.titleMedium),
+          Text('Giao diện', style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
           SegmentedButton<ThemeMode>(
             multiSelectionEnabled: false,
@@ -376,12 +376,12 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
               ),
               ButtonSegment<ThemeMode>(
                 value: ThemeMode.light,
-                label: Text('Sang'),
+                label: Text('Sáng'),
                 icon: Icon(Icons.light_mode),
               ),
               ButtonSegment<ThemeMode>(
                 value: ThemeMode.dark,
-                label: Text('Toi'),
+                label: Text('Tối'),
                 icon: Icon(Icons.dark_mode),
               ),
             ],
@@ -397,12 +397,12 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
               FilledButton.tonalIcon(
                 onPressed: _copySyncLink,
                 icon: const Icon(Icons.link),
-                label: const Text('Sao chep link'),
+                label: const Text('Sao chép link'),
               ),
               FilledButton.tonalIcon(
                 onPressed: _showImportDialog,
                 icon: const Icon(Icons.file_download_outlined),
-                label: const Text('Nhap link'),
+                label: const Text('Nhập link'),
               ),
               FilledButton.tonalIcon(
                 onPressed: () => _handleAsync(controller.backupToDiscord),
@@ -433,7 +433,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
           const SizedBox(height: 16),
           if (articles.isEmpty)
             Text(
-              'Chua co bai viet nao duoc tai.',
+              'Chưa có bài viết nào được tải.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
@@ -550,14 +550,14 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            'Chua co nguon RSS nao',
+            'Chưa có nguồn RSS nào',
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            'Them URL RSS de hien thi tin moi nhat, sap xep theo thoi gian, nhan thong bao khi co bai moi va doc ngay trong overlay.',
+            'Thêm URL RSS để hiển thị tin mới nhất, sắp xếp theo thời gian, nhận thông báo khi có bài mới và đọc ngay trong overlay.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               height: 1.5,
@@ -567,7 +567,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
           FilledButton.icon(
             onPressed: _showAddFeedDialog,
             icon: const Icon(Icons.add),
-            label: const Text('Them nguon dau tien'),
+            label: const Text('Thêm nguồn đầu tiên'),
           ),
         ],
       ),
@@ -627,7 +627,7 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
     final link = controller.buildSyncLink();
     await Clipboard.setData(ClipboardData(text: link));
     if (mounted) {
-      _showSnack('Da sao chep link dong bo vao clipboard.');
+      _showSnack('Đã sao chép link đồng bộ vào clipboard.');
     }
   }
 
@@ -716,9 +716,9 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
   String _describeFeedStatus(FeedSource feed) {
     final interval = _formatRefreshInterval(feed.refreshInterval);
     if (feed.lastFetchedAt == null) {
-      return 'Chua tai du lieu • $interval';
+      return 'Chưa tải dữ liệu • $interval';
     }
-    return 'Cap nhat ${_friendlyDate(feed.lastFetchedAt!)} • $interval';
+    return 'Cập nhật ${_friendlyDate(feed.lastFetchedAt!)} • $interval';
   }
 
   List<Widget> _withSpacing(List<Widget> widgets, double spacing) {
@@ -777,7 +777,7 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
                   child: TextField(
                     controller: _titleController,
                     decoration: const InputDecoration(
-                      labelText: 'Tieu de',
+                      labelText: 'Tiêu đề',
                       hintText: 'VnExpress',
                     ),
                   ),
@@ -788,7 +788,7 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
                   child: TextField(
                     controller: _urlController,
                     decoration: const InputDecoration(
-                      labelText: 'Dia chi RSS',
+                      labelText: 'Địa chỉ RSS',
                       hintText: 'https://vnexpress.net/rss/tin-moi-nhat.rss',
                     ),
                   ),
@@ -798,7 +798,7 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
                   width: 180,
                   child: DropdownButtonFormField<int>(
                     initialValue: _intervalMinutes,
-                    decoration: const InputDecoration(labelText: 'Lam moi'),
+                    decoration: const InputDecoration(labelText: 'Làm mới'),
                     items: _buildRefreshIntervalItems(_intervalMinutes),
                     onChanged: (value) {
                       if (value != null) {
@@ -817,7 +817,7 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
                 FilledButton.tonalIcon(
                   onPressed: _isLoading ? null : _loadPreview,
                   icon: const Icon(Icons.travel_explore_outlined),
-                  label: const Text('Kiem tra nguon'),
+                  label: const Text('Kiểm tra nguồn'),
                 ),
                 if (_preview != null) ...<Widget>[
                   const SizedBox(width: 12),
@@ -853,7 +853,7 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
                   : _preview == null
                   ? const Align(
                       alignment: Alignment.topLeft,
-                      child: Text('Preview bai viet moi nhat se hien o day.'),
+                      child: Text('Preview bài viết mới nhất sẽ hiển ở đây.'),
                     )
                   : ListView(
                       shrinkWrap: true,
@@ -878,11 +878,11 @@ class _AddFeedDialogState extends State<AddFeedDialog> {
       actions: <Widget>[
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Huy'),
+          child: const Text('Hủy'),
         ),
         FilledButton(
           onPressed: _isLoading ? null : _submit,
-          child: const Text('Them nguon'),
+          child: const Text('Thêm nguồn'),
         ),
       ],
     );
@@ -969,7 +969,7 @@ class _EditFeedDialogState extends State<EditFeedDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       clipBehavior: Clip.antiAlias,
-      title: const Text('Sua chu ky lam moi'),
+      title: const Text('Sửa chu kỳ làm mới'),
       content: SizedBox(
         width: 420,
         child: Column(
@@ -992,7 +992,7 @@ class _EditFeedDialogState extends State<EditFeedDialog> {
             const SizedBox(height: 18),
             DropdownButtonFormField<int>(
               initialValue: _intervalMinutes,
-              decoration: const InputDecoration(labelText: 'Lam moi'),
+              decoration: const InputDecoration(labelText: 'Làm mới'),
               items: _buildRefreshIntervalItems(_intervalMinutes),
               onChanged: (value) {
                 if (value != null) {
@@ -1004,7 +1004,7 @@ class _EditFeedDialogState extends State<EditFeedDialog> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Chu ky hien tai: ${_formatRefreshInterval(Duration(minutes: _intervalMinutes))}',
+              'Chu kỳ hiện tại: ${_formatRefreshInterval(Duration(minutes: _intervalMinutes))}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             if (_error != null) ...<Widget>[
@@ -1020,11 +1020,11 @@ class _EditFeedDialogState extends State<EditFeedDialog> {
       actions: <Widget>[
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Huy'),
+          child: const Text('Hủy'),
         ),
         FilledButton(
           onPressed: _isSaving ? null : _submit,
-          child: const Text('Luu'),
+          child: const Text('Lưu'),
         ),
       ],
     );
@@ -1078,7 +1078,7 @@ class _ImportSyncDialogState extends State<ImportSyncDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       clipBehavior: Clip.antiAlias,
-      title: const Text('Nhap link dong bo'),
+      title: const Text('Nhập link đồng bộ'),
       content: SizedBox(
         width: 560,
         child: Column(
@@ -1086,7 +1086,7 @@ class _ImportSyncDialogState extends State<ImportSyncDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             const Text(
-              'Dan full URL hoac chuoi sync=... de phuc hoi danh sach feed va thiet dat.',
+              'Dán full URL hoặc chuỗi sync=... để phục hồi danh sách feed và thiết đặt.',
             ),
             const SizedBox(height: 16),
             TextField(
@@ -1109,11 +1109,11 @@ class _ImportSyncDialogState extends State<ImportSyncDialog> {
       actions: <Widget>[
         TextButton(
           onPressed: _isImporting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Huy'),
+          child: const Text('Hủy'),
         ),
         FilledButton(
           onPressed: _isImporting ? null : _import,
-          child: const Text('Nhap du lieu'),
+          child: const Text('Nhập dữ liệu'),
         ),
       ],
     );
@@ -1162,7 +1162,7 @@ class ArticleReaderDialog extends StatelessWidget {
         ? article.content
         : (article.summary.isNotEmpty
               ? article.summary
-              : 'Feed nay khong cung cap noi dung day du. Hay mo bai goc de xem them.');
+              : 'Feed này không cung cấp nội dung đầy đủ. Hãy mở bài gốc để xem thêm.');
 
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
@@ -1212,7 +1212,7 @@ class ArticleReaderDialog extends StatelessWidget {
                   Chip(label: Text(article.author!)),
                 Chip(label: Text(_friendlyDate(article.publishedAt))),
                 if (canEmbedWeb)
-                  const Chip(label: Text('Dang mo trang goc trong overlay')),
+                  const Chip(label: Text('Đang mở trang gốc trong overlay')),
               ],
             ),
             const SizedBox(height: 18),
@@ -1224,7 +1224,7 @@ class ArticleReaderDialog extends StatelessWidget {
                         Expanded(child: ArticleWebView(url: readerUrl)),
                         const SizedBox(height: 10),
                         Text(
-                          'Neu trang nay chan iframe va hien trong/trang loi, dung "Mo tab moi" de xem ban goc.',
+                          'Nếu trang này chặn iframe và hiện trống/trang lỗi, dùng "Mở tab mới" để xem bản gốc.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface.withValues(
                               alpha: 0.65,
@@ -1239,7 +1239,7 @@ class ArticleReaderDialog extends StatelessWidget {
                         children: <Widget>[
                           if (hasLink)
                             Text(
-                              'Khong the mo trang nay trong overlay, app dang hien noi dung RSS thay the.',
+                              'Không thể mở trang này trong overlay, app đang hiển thị nội dung RSS thay thế.',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurface.withValues(
                                   alpha: 0.65,
@@ -1263,12 +1263,12 @@ class ArticleReaderDialog extends StatelessWidget {
                 FilledButton.tonalIcon(
                   onPressed: onOpenOriginal,
                   icon: const Icon(Icons.open_in_new),
-                  label: const Text('Mo tab moi'),
+                  label: const Text('Mở tab mới'),
                 ),
                 const Spacer(),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Dong'),
+                  child: const Text('Đóng'),
                 ),
               ],
             ),
@@ -1394,7 +1394,7 @@ class _BrandLogoCard extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.2),
                     ),
                     child: Text(
-                      '$unreadCount moi',
+                      '$unreadCount mới',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
@@ -1461,7 +1461,7 @@ class _BrandLogoCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         unreadCount > 0
-                            ? '$feedCount feed • $unreadCount moi'
+                            ? '$feedCount feed • $unreadCount mới'
                             : '$feedCount feed',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1973,7 +1973,7 @@ class _SpotlightCard extends StatelessWidget {
               child: FilledButton.tonalIcon(
                 onPressed: onOpenOriginal,
                 icon: const Icon(Icons.open_in_new),
-                label: const Text('Mo bai goc'),
+                label: const Text('Mở bài gốc'),
               ),
             ),
           ],
@@ -2049,7 +2049,7 @@ String _friendlyDate(DateTime dateTime) {
   if (local.year == now.year &&
       local.month == now.month &&
       local.day == now.day) {
-    return 'Hom nay $hh:$mm';
+    return 'Hôm nay $hh:$mm';
   }
   final year = local.year == now.year ? '' : '/${local.year}';
   return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}$year $hh:$mm';
@@ -2091,17 +2091,17 @@ List<DropdownMenuItem<int>> _buildRefreshIntervalItems(int currentMinutes) {
 String _formatRefreshInterval(Duration duration) {
   final minutes = duration.inMinutes;
   if (minutes < 60) {
-    return 'Moi $minutes phut';
+    return 'Mỗi $minutes phút';
   }
   if (minutes % (24 * 60) == 0) {
     final days = minutes ~/ (24 * 60);
-    return days == 1 ? 'Moi 1 ngay' : 'Moi $days ngay';
+    return days == 1 ? 'Mỗi 1 ngày' : 'Mỗi $days ngày';
   }
   if (minutes % 60 == 0) {
     final hours = minutes ~/ 60;
-    return hours == 1 ? 'Moi 1 gio' : 'Moi $hours gio';
+    return hours == 1 ? 'Mỗi 1 giờ' : 'Mỗi $hours giờ';
   }
   final hours = minutes ~/ 60;
   final remainMinutes = minutes % 60;
-  return 'Moi ${hours}g ${remainMinutes}p';
+  return 'Mỗi ${hours}g ${remainMinutes}p';
 }

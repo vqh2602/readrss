@@ -108,8 +108,8 @@ class RssService {
         );
       } catch (jsonError) {
         throw FeedLoadException(
-          'Khong tai duoc RSS. Web debug thuong bi chan boi CORS. '
-          'Chi tiet XML: $xmlError | Chi tiet JSON fallback: $jsonError',
+          'Không tải được RSS. Web debug thường bị chặn bởi CORS. '
+          'Chi tiết XML: $xmlError | Chi tiết JSON fallback: $jsonError',
         );
       }
     }
@@ -118,7 +118,7 @@ class RssService {
   Uri _normalizeUri(String rawUrl) {
     final trimmed = rawUrl.trim();
     if (trimmed.isEmpty) {
-      throw const FormatException('Dia chi RSS dang rong.');
+      throw const FormatException('Địa chỉ RSS đang rỗng.');
     }
     final value =
         trimmed.startsWith('http://') || trimmed.startsWith('https://')
@@ -126,7 +126,7 @@ class RssService {
         : 'https://$trimmed';
     final uri = Uri.tryParse(value);
     if (uri == null || !uri.hasAuthority) {
-      throw const FormatException('Dia chi RSS khong hop le.');
+      throw const FormatException('Địa chỉ RSS không hợp lệ.');
     }
     return uri;
   }
@@ -169,7 +169,7 @@ class RssService {
       }
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) {
-        throw const FeedLoadException('rss2json tra ve du lieu khong hop le.');
+        throw const FeedLoadException('rss2json trả về dữ liệu không hợp lệ.');
       }
       return decoded;
     } catch (error) {
@@ -238,7 +238,7 @@ class RssService {
       final message =
           jsonResponse['message']?.toString() ??
           jsonResponse['error']?.toString() ??
-          'rss2json khong tra ve trang thai ok.';
+          'rss2json không trả về trạng thái ok.';
       throw FeedLoadException(message);
     }
 
@@ -314,7 +314,7 @@ class RssService {
     final trimmedItems = items.take(_maxItemsPerFeed).toList();
     if (trimmedItems.isEmpty) {
       throw const FeedLoadException(
-        'Nguon RSS khong tra ve bai viet nao hoac proxy tra du lieu rong.',
+        'Nguồn RSS không trả về bài viết nào hoặc proxy trả dữ liệu rỗng.',
       );
     }
     return FeedRefreshResult(
@@ -331,7 +331,7 @@ class RssService {
     required String feedTitle,
     required bool adBlockEnabled,
   }) {
-    final title = _readText(_firstChild(item, 'title')) ?? 'Khong co tieu de';
+    final title = _readText(_firstChild(item, 'title')) ?? 'Không có tiêu đề';
     final link = _readText(_firstChild(item, 'link')) ?? source.url;
     final guid = _readText(_firstChild(item, 'guid')) ?? link;
     final descriptionHtml = _readText(_firstChild(item, 'description')) ?? '';
@@ -375,7 +375,7 @@ class RssService {
     required String feedTitle,
     required bool adBlockEnabled,
   }) {
-    final title = _readText(_firstChild(item, 'title')) ?? 'Khong co tieu de';
+    final title = _readText(_firstChild(item, 'title')) ?? 'Không có tiêu đề';
     final link = _resolveAtomLink(item) ?? source.url;
     final guid = _readText(_firstChild(item, 'id')) ?? link;
     final summaryHtml = _readText(_firstChild(item, 'summary')) ?? '';
@@ -499,6 +499,18 @@ class RssService {
 
     final iso = DateTime.tryParse(value);
     if (iso != null) {
+      if (!iso.isUtc && !_containsTimezoneDesignator(value)) {
+        return DateTime.utc(
+          iso.year,
+          iso.month,
+          iso.day,
+          iso.hour,
+          iso.minute,
+          iso.second,
+          iso.millisecond,
+          iso.microsecond,
+        ).toLocal();
+      }
       return iso.toLocal();
     }
 
@@ -514,7 +526,7 @@ class RssService {
 
     for (final format in _rfc822Formats) {
       try {
-        return format.parseLoose(value);
+        return format.parseUtc(value).toLocal();
       } catch (_) {
         // Try next pattern.
       }
@@ -526,7 +538,7 @@ class RssService {
       DateFormat('dd MMM yyyy HH:mm', 'en_US'),
     ]) {
       try {
-        return format.parseLoose(cleaned);
+        return format.parseUtc(cleaned).toLocal();
       } catch (_) {
         // Try next pattern.
       }
@@ -551,12 +563,12 @@ class RssService {
 
     final zone = match.group(7)?.trim();
     if (zone == null || zone.isEmpty) {
-      return DateTime(year, month, day, hour, minute, second);
+      return DateTime.utc(year, month, day, hour, minute, second).toLocal();
     }
 
     final offset = _parseTimeZoneOffset(zone);
     if (offset == null) {
-      return DateTime(year, month, day, hour, minute, second);
+      return DateTime.utc(year, month, day, hour, minute, second).toLocal();
     }
 
     return DateTime.utc(
@@ -597,6 +609,14 @@ class RssService {
       return null;
     }
     return Duration(hours: hours * sign, minutes: minutes * sign);
+  }
+
+  bool _containsTimezoneDesignator(String value) {
+    final normalized = value.toUpperCase();
+    return normalized.contains('Z') ||
+        normalized.contains(' GMT') ||
+        normalized.contains(' UTC') ||
+        RegExp(r'([+\-]\d{2}:?\d{2})$').hasMatch(normalized);
   }
 
   String _sanitizeHtml(String rawValue, {required bool adBlockEnabled}) {

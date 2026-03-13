@@ -24,7 +24,7 @@ class ArticleWebView extends StatelessWidget {
             const Icon(Icons.language, size: 28),
             const SizedBox(height: 12),
             Text(
-              'Che do xem web truc tiep chi ho tro tren Flutter web.',
+              'Chế độ xem web trực tiếp chỉ hỗ trợ trên Flutter web.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium,
             ),

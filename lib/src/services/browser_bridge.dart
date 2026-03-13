@@ -8,10 +8,10 @@ enum NotificationAccess {
   denied;
 
   String get label => switch (this) {
-    NotificationAccess.unsupported => 'Khong ho tro',
-    NotificationAccess.pending => 'Can cap quyen',
-    NotificationAccess.granted => 'Da cap quyen',
-    NotificationAccess.denied => 'Da chan',
+    NotificationAccess.unsupported => 'Không hỗ trợ',
+    NotificationAccess.pending => 'Cần cấp quyền',
+    NotificationAccess.granted => 'Đã cấp quyền',
+    NotificationAccess.denied => 'Đã chặn',
   };
 }
 

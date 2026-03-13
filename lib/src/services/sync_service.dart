@@ -68,7 +68,7 @@ class SyncService {
       jsonPayload: jsonPayload,
     );
     if (!success) {
-      throw StateError('Khong gui duoc backup toi Discord.');
+      throw StateError('Không gửi được backup tới Discord.');
     }
   }
 
