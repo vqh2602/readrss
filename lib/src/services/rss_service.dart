@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:http/http.dart' as http;
@@ -10,9 +11,12 @@ import 'package:xml/xml.dart';
 import '../models.dart';
 
 class RssService {
-  RssService({http.Client? client}) : _client = client ?? http.Client();
+  RssService({http.Client? client, String? gatewayBaseUrl})
+    : _client = client ?? http.Client(),
+      _gatewayBaseUri = _resolveGatewayBaseUri(gatewayBaseUrl);
 
   static const _requestTimeout = Duration(seconds: 14);
+  static const _defaultGatewayUrl = 'https://readrss-gateway.onrender.com';
   static final _rfc822Formats = <DateFormat>[
     DateFormat('EEE, dd MMM yyyy HH:mm:ss', 'en_US'),
     DateFormat('EEE, dd MMM yyyy HH:mm', 'en_US'),
@@ -66,6 +70,7 @@ class RssService {
   ];
 
   final http.Client _client;
+  final Uri? _gatewayBaseUri;
 
   Future<FeedPreview> previewFeed(
     String rawUrl, {
@@ -90,8 +95,12 @@ class RssService {
     required bool adBlockEnabled,
   }) async {
     final normalizedUri = _normalizeUri(source.url);
+    final requestUri = _buildRequestUri(normalizedUri);
     try {
-      final payload = await _downloadFeedXml(normalizedUri);
+      final payload = await _downloadFeedXml(
+        requestUri,
+        sourceUri: normalizedUri,
+      );
       final jsonFeedResult = _tryParseJsonFeedPayload(
         payload: payload,
         source: source,
@@ -105,20 +114,11 @@ class RssService {
         source: source,
         adBlockEnabled: adBlockEnabled,
       );
-    } catch (xmlError) {
-      try {
-        final jsonResponse = await _downloadFeedAsJson(normalizedUri);
-        return _parseRss2Json(
-          jsonResponse: jsonResponse,
-          source: source,
-          adBlockEnabled: adBlockEnabled,
-        );
-      } catch (jsonError) {
-        throw FeedLoadException(
-          'Không tải được RSS. Web debug thường bị chặn bởi CORS. '
-          'Chi tiết XML: $xmlError | Chi tiết JSON fallback: $jsonError',
-        );
+    } catch (error) {
+      if (error is FeedLoadException) {
+        rethrow;
       }
+      throw FeedLoadException(_describeFetchError(error, normalizedUri));
     }
   }
 
@@ -138,92 +138,93 @@ class RssService {
     return uri;
   }
 
-  Future<String> _downloadFeedXml(Uri source) async {
-    Object? lastError;
-    for (final target in _buildXmlFetchTargets(source)) {
-      try {
-        final response = await _client
-            .get(
-              target,
-              headers: const <String, String>{
-                'accept':
-                    'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
-                'cache-control': 'no-cache',
-              },
-            )
-            .timeout(_requestTimeout);
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          final body = _resolveXmlPayload(target, response.body);
-          if (body.isNotEmpty) {
-            return body;
-          }
-          lastError = 'Dữ liệu rỗng @ $target';
-          continue;
-        }
-        lastError = 'HTTP ${response.statusCode} @ $target';
-      } catch (error) {
-        lastError = '$error @ $target';
-      }
+  Uri _buildRequestUri(Uri sourceUri) {
+    final gateway = _gatewayBaseUri;
+    if (gateway == null) {
+      return sourceUri;
     }
-    throw FeedLoadException('$lastError');
+    final basePath = gateway.path.endsWith('/')
+        ? gateway.path.substring(0, gateway.path.length - 1)
+        : gateway.path;
+    final path = basePath.isEmpty ? '/api/rss' : '$basePath/api/rss';
+    return gateway.replace(
+      path: path,
+      queryParameters: <String, String>{'url': sourceUri.toString()},
+    );
   }
 
-  Future<Map<String, dynamic>> _downloadFeedAsJson(Uri source) async {
-    final target = Uri.parse(
-      'https://api.rss2json.com/v1/api.json?rss_url=${Uri.encodeComponent(source.toString())}',
-    );
+  Future<String> _downloadFeedXml(
+    Uri requestUri, {
+    required Uri sourceUri,
+  }) async {
     try {
-      final response = await _client.get(target).timeout(_requestTimeout);
+      // Keep request simple to avoid triggering CORS preflight in web.
+      final response = await _client.get(requestUri).timeout(_requestTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw FeedLoadException('HTTP ${response.statusCode} @ $target');
+        throw FeedLoadException('HTTP ${response.statusCode} @ $sourceUri');
       }
-      final decoded = jsonDecode(response.body);
-      if (decoded is! Map<String, dynamic>) {
-        throw const FeedLoadException('rss2json trả về dữ liệu không hợp lệ.');
+      final body = response.body.trim();
+      if (body.isEmpty) {
+        throw FeedLoadException('Nguồn RSS trả về dữ liệu rỗng @ $sourceUri');
       }
-      return decoded;
+      return body;
     } catch (error) {
       if (error is FeedLoadException) {
         rethrow;
       }
-      throw FeedLoadException('$error @ $target');
+      throw FeedLoadException('$error @ $sourceUri');
     }
   }
 
-  List<Uri> _buildXmlFetchTargets(Uri source) {
-    final encoded = Uri.encodeComponent(source.toString());
-    return <Uri>[
-      source,
-      Uri.parse(
-        'https://api.allorigins.win/get?disableCache=true&url=$encoded',
-      ),
-      Uri.parse('https://api.allorigins.win/raw?url=$encoded'),
-      Uri.parse('https://api.codetabs.com/v1/proxy/?quest=$encoded'),
-    ];
-  }
-
-  String _resolveXmlPayload(Uri target, String body) {
-    final trimmed = body.trim();
-    if (trimmed.isEmpty) {
-      return '';
-    }
-
-    final isAllOriginsGet =
-        target.host == 'api.allorigins.win' && target.path.endsWith('/get');
-    if (!isAllOriginsGet) {
-      return trimmed;
-    }
-
-    try {
-      final decoded = jsonDecode(trimmed);
-      if (decoded is! Map<String, dynamic>) {
-        return '';
+  String _describeFetchError(Object error, Uri source) {
+    final message = error.toString();
+    final gateway = _gatewayBaseUri;
+    if (gateway != null) {
+      if (message.toLowerCase().contains('connection refused') ||
+          message.toLowerCase().contains('failed host lookup')) {
+        return 'Không kết nối được RSS gateway $gateway. Hãy chạy: dart run tool/rss_gateway.dart --port ${gateway.port == 0 ? 8787 : gateway.port}';
       }
-      final contents = decoded['contents']?.toString().trim() ?? '';
-      return contents;
-    } catch (_) {
-      return '';
+      return 'Không tải được RSS qua gateway $gateway cho nguồn $source. Chi tiết: $message';
     }
+    final normalized = message.toLowerCase();
+    if (normalized.contains('xmlhttprequest error') ||
+        normalized.contains('failed to fetch') ||
+        normalized.contains('cors')) {
+      return 'Nguồn RSS đang chặn CORS khi đọc trực tiếp trên trình duyệt: $source';
+    }
+    return 'Không tải được RSS trực tiếp từ nguồn gốc. Chi tiết: $message';
+  }
+
+  static Uri? _parseGatewayBaseUri(String rawValue) {
+    final trimmed = rawValue.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null ||
+        !uri.hasAuthority ||
+        uri.host.trim().isEmpty ||
+        (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return null;
+    }
+    return uri;
+  }
+
+  static Uri? _resolveGatewayBaseUri(String? gatewayBaseUrl) {
+    final explicit = gatewayBaseUrl?.trim() ?? '';
+    if (explicit.isNotEmpty) {
+      return _parseGatewayBaseUri(explicit);
+    }
+
+    final defined = const String.fromEnvironment('RSS_GATEWAY_URL').trim();
+    if (defined.isNotEmpty) {
+      return _parseGatewayBaseUri(defined);
+    }
+
+    if (kIsWeb) {
+      return _parseGatewayBaseUri(_defaultGatewayUrl);
+    }
+    return null;
   }
 
   FeedRefreshResult _parseFeed({
@@ -261,53 +262,6 @@ class RssService {
       resolvedTitle: resolvedTitle.trim().isEmpty
           ? source.title
           : resolvedTitle,
-      items: items,
-    );
-  }
-
-  FeedRefreshResult _parseRss2Json({
-    required Map<String, dynamic> jsonResponse,
-    required FeedSource source,
-    required bool adBlockEnabled,
-  }) {
-    final status = jsonResponse['status']?.toString().toLowerCase();
-    if (status != 'ok') {
-      final message =
-          jsonResponse['message']?.toString() ??
-          jsonResponse['error']?.toString() ??
-          'rss2json không trả về trạng thái ok.';
-      throw FeedLoadException(message);
-    }
-
-    final feedJson = jsonResponse['feed'];
-    final resolvedTitle = feedJson is Map<String, dynamic>
-        ? (feedJson['title']?.toString().trim().isNotEmpty == true
-              ? feedJson['title'].toString().trim()
-              : source.title)
-        : source.title;
-
-    final itemsJson =
-        (jsonResponse['items'] as List<dynamic>? ?? const <dynamic>[]);
-    final items =
-        itemsJson
-            .whereType<Map<dynamic, dynamic>>()
-            .map(
-              (item) => _parseRss2JsonItem(
-                Map<String, dynamic>.from(item),
-                source: source,
-                feedTitle: resolvedTitle,
-                adBlockEnabled: adBlockEnabled,
-              ),
-            )
-            .whereType<NewsItem>()
-            .toList()
-          ..sort(
-            (left, right) => right.publishedAt.compareTo(left.publishedAt),
-          );
-
-    return _finalizeFeedResult(
-      source: source,
-      resolvedTitle: resolvedTitle,
       items: items,
     );
   }
@@ -415,9 +369,7 @@ class RssService {
     required List<NewsItem> items,
   }) {
     if (items.isEmpty) {
-      throw const FeedLoadException(
-        'Nguồn RSS không trả về bài viết nào hoặc proxy trả dữ liệu rỗng.',
-      );
+      throw const FeedLoadException('Nguồn RSS không trả về bài viết nào.');
     }
     return FeedRefreshResult(
       source: source,
@@ -510,50 +462,6 @@ class RssService {
       content: _sanitizeHtml(contentHtml, adBlockEnabled: adBlockEnabled),
       author: author,
       imageUrl: _extractImageUrl(item, summaryHtml, contentHtml),
-    );
-  }
-
-  NewsItem? _parseRss2JsonItem(
-    Map<String, dynamic> item, {
-    required FeedSource source,
-    required String feedTitle,
-    required bool adBlockEnabled,
-  }) {
-    final title = item['title']?.toString().trim();
-    final link = item['link']?.toString().trim();
-    if (title == null || title.isEmpty || link == null || link.isEmpty) {
-      return null;
-    }
-
-    final descriptionHtml = item['description']?.toString() ?? '';
-    final contentHtml = item['content']?.toString().trim().isNotEmpty == true
-        ? item['content'].toString()
-        : descriptionHtml;
-    final publishedAt =
-        _parseDate(item['pubDate']?.toString()) ??
-        _parseDate(item['published']?.toString()) ??
-        DateTime.now();
-    final imageUrl = item['thumbnail']?.toString().trim().isNotEmpty == true
-        ? item['thumbnail'].toString().trim()
-        : _extractImageUrlFromHtml(contentHtml, descriptionHtml);
-
-    return NewsItem(
-      id: NewsItem.createId(
-        feedId: source.id,
-        guid: item['guid']?.toString() ?? item['id']?.toString() ?? link,
-        link: link,
-        title: title,
-        publishedAt: publishedAt,
-      ),
-      feedId: source.id,
-      feedTitle: feedTitle,
-      title: title,
-      link: link,
-      publishedAt: publishedAt,
-      summary: _sanitizeHtml(descriptionHtml, adBlockEnabled: adBlockEnabled),
-      content: _sanitizeHtml(contentHtml, adBlockEnabled: adBlockEnabled),
-      author: item['author']?.toString(),
-      imageUrl: imageUrl,
     );
   }
 
@@ -829,21 +737,6 @@ class RssService {
         }
       }
     }
-    for (final rawHtml in <String>[contentHtml, descriptionHtml]) {
-      if (rawHtml.trim().isEmpty) {
-        continue;
-      }
-      final fragment = html_parser.parseFragment(rawHtml);
-      final image = fragment.querySelector('img');
-      final url = image?.attributes['src'] ?? image?.attributes['data-src'];
-      if (url != null && url.trim().isNotEmpty) {
-        return url.trim();
-      }
-    }
-    return null;
-  }
-
-  String? _extractImageUrlFromHtml(String contentHtml, String descriptionHtml) {
     for (final rawHtml in <String>[contentHtml, descriptionHtml]) {
       if (rawHtml.trim().isEmpty) {
         continue;

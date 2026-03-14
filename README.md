@@ -1,20 +1,56 @@
-# readrss
+# ReadRSS
 
-A new Flutter project.
+Flutter RSS reader with auto refresh, notification badge, sync link, and in-app article overlay.
 
-## Getting Started
+## Run App
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run -d chrome
+```
 
-A few resources to get you started if this is your first Flutter project:
+Web app mặc định dùng gateway:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+`https://readrss-gateway.onrender.com`
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## RSS Gateway (shelf + CORS)
 
-flutter build web --base-href /terrarium_data.github.io/tintuc/ --release 
+For feeds blocked by browser CORS, run local gateway:
 
+```bash
+dart run tool/rss_gateway.dart --port 8787
+```
+
+Nếu muốn override sang gateway khác (ví dụ local), dùng:
+
+```bash
+flutter run -d chrome --dart-define=RSS_GATEWAY_URL=http://localhost:8787
+```
+
+Gateway endpoints:
+
+- `GET /health`
+- `GET /api/rss?url=<encoded_rss_url>`
+
+## Deploy Gateway on Render
+
+This repo already includes Render Blueprint config: [render.yaml](render.yaml).
+
+1. Push code to GitHub.
+2. In Render: `New +` -> `Blueprint` -> select this repo.
+3. Deploy service `readrss-gateway` (free plan).
+4. After deploy, copy gateway URL, for example:
+   `https://readrss-gateway.onrender.com`
+
+Build Flutter Web with gateway URL:
+
+```bash
+flutter build web --release --dart-define=RSS_GATEWAY_URL=https://readrss-gateway.onrender.com
+```
+
+## Build
+
+```bash
+flutter build web --release
 flutter build apk --release
+```
