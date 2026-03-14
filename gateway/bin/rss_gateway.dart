@@ -63,20 +63,16 @@ Future<void> main(List<String> args) async {
             'user-agent': 'RSSNewsHub-Gateway/1.0',
           },
         );
-        final passthroughHeaders = <String, String>{};
-        for (final entry in upstreamResponse.headers.entries) {
-          if (!_hopByHopHeaders.contains(entry.key.toLowerCase())) {
-            passthroughHeaders[entry.key] = entry.value;
-          }
-        }
         return Response(
           upstreamResponse.statusCode,
           body: upstreamResponse.bodyBytes,
           headers: <String, String>{
-            ...passthroughHeaders,
-            if (!passthroughHeaders.containsKey('content-type'))
-              'content-type': 'application/xml; charset=utf-8',
+            'content-type': _resolveContentType(
+              upstreamContentType: upstreamResponse.headers['content-type'],
+              requestAcceptHeader: request.headers['accept'],
+            ),
             'cache-control': 'no-store',
+            'x-rss-gateway': 'readrss',
           },
         );
       } catch (error) {
@@ -175,14 +171,18 @@ bool _isBlockedHost(String host) {
   return false;
 }
 
-const Set<String> _hopByHopHeaders = <String>{
-  'connection',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
-  'content-length',
-};
+String _resolveContentType({
+  required String? upstreamContentType,
+  required String? requestAcceptHeader,
+}) {
+  final accepts = requestAcceptHeader?.toLowerCase() ?? '';
+  if (accepts.contains('text/html')) {
+    // Browsers opening this URL directly render plain text more predictably.
+    return 'text/plain; charset=utf-8';
+  }
+  final upstream = upstreamContentType?.toLowerCase() ?? '';
+  if (upstream.contains('json')) {
+    return 'application/json; charset=utf-8';
+  }
+  return 'application/xml; charset=utf-8';
+}
