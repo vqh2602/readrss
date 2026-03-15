@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:web/web.dart' as web;
 
 int _articleWebViewCounter = 0;
+final String _articleWebViewPrefix = DateTime.now().microsecondsSinceEpoch
+    .toString();
 
 class ArticleWebView extends StatefulWidget {
   const ArticleWebView({super.key, required this.url});
@@ -28,7 +30,8 @@ class _ArticleWebViewState extends State<ArticleWebView> {
   }
 
   String _registerView(String url) {
-    final viewType = 'article-web-view-${_articleWebViewCounter++}';
+    final viewType =
+        'article-web-view-$_articleWebViewPrefix-${_articleWebViewCounter++}';
     ui_web.platformViewRegistry.registerViewFactory(viewType, (viewId) {
       final iframe = web.HTMLIFrameElement()
         ..src = url

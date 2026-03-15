@@ -359,7 +359,44 @@ class RssController extends ChangeNotifier {
   }
 
   void openOriginalArticle(String url) {
-    _browserBridge.openExternal(url);
+    final normalizedUrl = normalizeExternalArticleUrl(url);
+    if (normalizedUrl == null) {
+      return;
+    }
+    _browserBridge.openExternal(normalizedUrl);
+  }
+
+  bool canOpenOriginalArticle(String url) {
+    return normalizeExternalArticleUrl(url) != null;
+  }
+
+  String? normalizeExternalArticleUrl(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    Uri? uri = Uri.tryParse(trimmed);
+    uri ??= Uri.tryParse(Uri.encodeFull(trimmed));
+    if (uri == null) {
+      return null;
+    }
+
+    if (!uri.hasScheme) {
+      final candidate = trimmed.startsWith('//')
+          ? 'https:$trimmed'
+          : 'https://$trimmed';
+      uri = Uri.tryParse(candidate) ?? Uri.tryParse(Uri.encodeFull(candidate));
+    }
+    if (uri == null || uri.host.trim().isEmpty) {
+      return null;
+    }
+
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      return null;
+    }
+    return uri.toString();
   }
 
   String buildSyncLink() {

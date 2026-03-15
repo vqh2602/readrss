@@ -533,8 +533,10 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
             article: articles.first,
             unread: controller.isArticleUnread(articles.first.id),
             onTap: () => _openReader(articles.first),
-            onOpenOriginal: () =>
-                controller.openOriginalArticle(articles.first.link),
+            onOpenOriginal:
+                controller.canOpenOriginalArticle(articles.first.link)
+                ? () => controller.openOriginalArticle(articles.first.link)
+                : null,
           ),
           ...articles
               .skip(1)
@@ -785,7 +787,9 @@ class _ReadRssHomePageState extends State<ReadRssHomePage> {
       barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (context) => ArticleReaderDialog(
         article: article,
-        onOpenOriginal: () => controller.openOriginalArticle(article.link),
+        onOpenOriginal: controller.canOpenOriginalArticle(article.link)
+            ? () => controller.openOriginalArticle(article.link)
+            : null,
       ),
     );
   }
@@ -1240,7 +1244,7 @@ class ArticleReaderDialog extends StatelessWidget {
   });
 
   final NewsItem article;
-  final VoidCallback onOpenOriginal;
+  final VoidCallback? onOpenOriginal;
 
   @override
   Widget build(BuildContext context) {
@@ -2026,7 +2030,7 @@ class _SpotlightCard extends StatelessWidget {
   final NewsItem article;
   final bool unread;
   final VoidCallback onTap;
-  final VoidCallback onOpenOriginal;
+  final VoidCallback? onOpenOriginal;
 
   @override
   Widget build(BuildContext context) {
@@ -2206,14 +2210,42 @@ String _normalizeReaderText(String value) {
 }
 
 String? _buildOverlayReaderUrl(String rawUrl) {
-  final uri = Uri.tryParse(rawUrl);
-  if (uri == null || uri.host.isEmpty) {
+  final trimmed = rawUrl.trim();
+  if (trimmed.isEmpty) {
     return null;
   }
-  if (_isKnownIframeBlockedHost(rawUrl)) {
+
+  Uri? uri = Uri.tryParse(trimmed);
+  uri ??= Uri.tryParse(Uri.encodeFull(trimmed));
+  if (uri == null) {
     return null;
   }
-  return rawUrl;
+
+  if (!uri.hasScheme) {
+    final candidate = trimmed.startsWith('//')
+        ? 'https:$trimmed'
+        : 'https://$trimmed';
+    uri = Uri.tryParse(candidate) ?? Uri.tryParse(Uri.encodeFull(candidate));
+  }
+  if (uri == null || uri.host.trim().isEmpty) {
+    return null;
+  }
+
+  final scheme = uri.scheme.toLowerCase();
+  if (scheme != 'http' && scheme != 'https') {
+    return null;
+  }
+  if (_isKnownIframeBlockedHost(uri.toString())) {
+    return null;
+  }
+
+  if (scheme == 'http') {
+    uri = uri.replace(
+      scheme: 'https',
+      port: uri.hasPort && uri.port != 80 ? uri.port : null,
+    );
+  }
+  return uri.toString();
 }
 
 List<DropdownMenuItem<int>> _buildRefreshIntervalItems(int currentMinutes) {

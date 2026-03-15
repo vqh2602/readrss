@@ -68,6 +68,7 @@ class RssService {
     'taboola',
     'outbrain',
   ];
+  static final _hostLikePattern = RegExp(r'^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$');
 
   final http.Client _client;
   final Uri? _gatewayBaseUri;
@@ -386,13 +387,25 @@ class RssService {
     required bool adBlockEnabled,
   }) {
     final title = _readText(_firstChild(item, 'title')) ?? 'Không có tiêu đề';
-    final link = _readText(_firstChild(item, 'link')) ?? source.url;
-    final guid = _readText(_firstChild(item, 'guid')) ?? link;
+    final linkNode = _firstChild(item, 'link');
+    final guidNode = _firstChild(item, 'guid');
+    final linkText = _readText(linkNode);
+    final guidText = _readText(guidNode);
     final descriptionHtml = _readText(_firstChild(item, 'description')) ?? '';
     final contentHtml =
         _readText(_firstChild(item, 'encoded')) ??
         _readText(_firstChild(item, 'content')) ??
         descriptionHtml;
+    final link = _resolveArticleLink(
+      sourceUrl: source.url,
+      candidates: <String?>[
+        linkText,
+        _resolveGuidPermalinkCandidate(guidNode, guidText),
+        _extractFirstAnchorHref(descriptionHtml),
+        _extractFirstAnchorHref(contentHtml),
+      ],
+    );
+    final guid = guidText?.trim().isNotEmpty == true ? guidText!.trim() : link;
     final publishedAt =
         _parseDate(
           _readText(_firstChild(item, 'pubDate')) ??
@@ -430,10 +443,20 @@ class RssService {
     required bool adBlockEnabled,
   }) {
     final title = _readText(_firstChild(item, 'title')) ?? 'Không có tiêu đề';
-    final link = _resolveAtomLink(item) ?? source.url;
-    final guid = _readText(_firstChild(item, 'id')) ?? link;
+    final linkText = _resolveAtomLink(item);
+    final idText = _readText(_firstChild(item, 'id'));
     final summaryHtml = _readText(_firstChild(item, 'summary')) ?? '';
     final contentHtml = _readText(_firstChild(item, 'content')) ?? summaryHtml;
+    final link = _resolveArticleLink(
+      sourceUrl: source.url,
+      candidates: <String?>[
+        linkText,
+        idText,
+        _extractFirstAnchorHref(summaryHtml),
+        _extractFirstAnchorHref(contentHtml),
+      ],
+    );
+    final guid = idText?.trim().isNotEmpty == true ? idText!.trim() : link;
     final publishedAt =
         _parseDate(
           _readText(_firstChild(item, 'updated')) ??
@@ -474,18 +497,25 @@ class RssService {
     final title = item['title']?.toString().trim().isNotEmpty == true
         ? item['title'].toString().trim()
         : 'Không có tiêu đề';
-    final link = item['url']?.toString().trim().isNotEmpty == true
+    final linkText = item['url']?.toString().trim().isNotEmpty == true
         ? item['url'].toString().trim()
         : (item['external_url']?.toString().trim().isNotEmpty == true
               ? item['external_url'].toString().trim()
-              : source.url);
-    if (link.isEmpty) {
-      return null;
-    }
+              : null);
+    final idText = item['id']?.toString();
 
     final contentHtml = item['content_html']?.toString() ?? '';
     final contentText = item['content_text']?.toString() ?? '';
     final summaryHtml = contentHtml.isNotEmpty ? contentHtml : contentText;
+    final link = _resolveArticleLink(
+      sourceUrl: source.url,
+      candidates: <String?>[
+        linkText,
+        idText,
+        _extractFirstAnchorHref(contentHtml),
+        _extractFirstAnchorHref(contentText),
+      ],
+    );
     final publishedAt =
         _parseDate(item['date_published']?.toString()) ??
         _parseDate(item['date_modified']?.toString()) ??
@@ -497,7 +527,7 @@ class RssService {
     return NewsItem(
       id: NewsItem.createId(
         feedId: source.id,
-        guid: item['id']?.toString() ?? link,
+        guid: idText?.trim().isNotEmpty == true ? idText!.trim() : link,
         link: link,
         title: title,
         publishedAt: publishedAt,
@@ -551,6 +581,122 @@ class RssService {
       fallback ??= href;
     }
     return fallback;
+  }
+
+  String _resolveArticleLink({
+    required String sourceUrl,
+    required List<String?> candidates,
+  }) {
+    final baseUri = Uri.tryParse(sourceUrl);
+    for (final candidate in candidates) {
+      final normalized = _normalizeArticleUrlCandidate(
+        rawCandidate: candidate,
+        baseUri: baseUri,
+      );
+      if (normalized != null) {
+        return normalized;
+      }
+    }
+    return _normalizeArticleUrlCandidate(
+          rawCandidate: sourceUrl,
+          baseUri: null,
+        ) ??
+        sourceUrl.trim();
+  }
+
+  String? _normalizeArticleUrlCandidate({
+    required String? rawCandidate,
+    required Uri? baseUri,
+  }) {
+    final trimmed = rawCandidate?.trim();
+    if (trimmed == null || trimmed.isEmpty || trimmed.startsWith('#')) {
+      return null;
+    }
+
+    Uri? uri = Uri.tryParse(trimmed);
+    uri ??= Uri.tryParse(Uri.encodeFull(trimmed));
+    if (uri == null) {
+      return null;
+    }
+
+    if (!uri.hasScheme) {
+      final hostCandidate = _extractHostCandidate(trimmed);
+      if (trimmed.startsWith('//')) {
+        final scheme = _safeHttpScheme(baseUri?.scheme) ?? 'https';
+        final absolute = '$scheme:$trimmed';
+        uri = Uri.tryParse(absolute) ?? Uri.tryParse(Uri.encodeFull(absolute));
+      } else if (hostCandidate != null) {
+        final absolute = 'https://$trimmed';
+        uri = Uri.tryParse(absolute) ?? Uri.tryParse(Uri.encodeFull(absolute));
+      } else if (baseUri != null && baseUri.hasAuthority) {
+        uri = baseUri.resolveUri(uri);
+      } else {
+        return null;
+      }
+    }
+
+    if (uri == null || uri.host.trim().isEmpty) {
+      return null;
+    }
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      return null;
+    }
+    return uri.toString();
+  }
+
+  String? _extractFirstAnchorHref(String rawHtml) {
+    if (rawHtml.trim().isEmpty || !rawHtml.contains('<a')) {
+      return null;
+    }
+    final fragment = html_parser.parseFragment(rawHtml);
+    return fragment.querySelector('a[href]')?.attributes['href']?.trim();
+  }
+
+  String? _resolveGuidPermalinkCandidate(
+    XmlElement? guidNode,
+    String? guidText,
+  ) {
+    final value = guidText?.trim();
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+
+    final isPermalinkAttr = guidNode
+        ?.getAttribute('isPermaLink')
+        ?.trim()
+        .toLowerCase();
+    if (isPermalinkAttr == 'false') {
+      // Some feeds still use URL with isPermaLink=false; keep it only if absolute.
+      final parsed = Uri.tryParse(value);
+      if (parsed == null || !parsed.hasAbsolutePath || !parsed.hasScheme) {
+        return null;
+      }
+      final scheme = parsed.scheme.toLowerCase();
+      return scheme == 'http' || scheme == 'https' ? value : null;
+    }
+    return value;
+  }
+
+  String? _extractHostCandidate(String value) {
+    if (value.startsWith('/') ||
+        value.startsWith('.') ||
+        value.startsWith('?')) {
+      return null;
+    }
+    final firstSegment = value.split(RegExp(r'[/?#]')).first;
+    if (_hostLikePattern.hasMatch(firstSegment)) {
+      return firstSegment;
+    }
+    return null;
+  }
+
+  String? _safeHttpScheme(String? rawScheme) {
+    if (rawScheme == null) {
+      return null;
+    }
+    final normalized = rawScheme.toLowerCase();
+    return normalized == 'http' || normalized == 'https' ? normalized : null;
   }
 
   DateTime? _parseDate(String? rawValue) {

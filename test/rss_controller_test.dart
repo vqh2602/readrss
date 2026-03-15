@@ -6,6 +6,29 @@ import 'package:readrss/src/services/local_storage_service.dart';
 import 'package:readrss/src/services/rss_service.dart';
 
 void main() {
+  test('openOriginalArticle normalizes scheme-less URL before opening', () {
+    final browserBridge = _FakeBrowserBridge();
+    final controller = RssController(browserBridge: browserBridge);
+
+    controller.openOriginalArticle('vnexpress.net/tin-moi-nhat');
+
+    expect(browserBridge.lastOpenedUrl, 'https://vnexpress.net/tin-moi-nhat');
+  });
+
+  test(
+    'openOriginalArticle ignores invalid URL and does not open blank tab',
+    () {
+      final browserBridge = _FakeBrowserBridge();
+      final controller = RssController(browserBridge: browserBridge);
+
+      controller.openOriginalArticle('   ');
+      controller.openOriginalArticle('javascript:alert(1)');
+
+      expect(browserBridge.openExternalCallCount, 0);
+      expect(browserBridge.lastOpenedUrl, isNull);
+    },
+  );
+
   test(
     'refresh does not get stuck when storage rejects large cached payload',
     () async {
@@ -91,6 +114,9 @@ class _StorageRejectsCachedItems extends LocalStorageService {
 }
 
 class _FakeBrowserBridge implements BrowserBridge {
+  int openExternalCallCount = 0;
+  String? lastOpenedUrl;
+
   @override
   String get currentUrl => 'https://localhost';
 
@@ -101,7 +127,10 @@ class _FakeBrowserBridge implements BrowserBridge {
   void clearSyncFragment() {}
 
   @override
-  void openExternal(String url) {}
+  void openExternal(String url) {
+    openExternalCallCount += 1;
+    lastOpenedUrl = url;
+  }
 
   @override
   Future<NotificationAccess> requestNotificationPermission() async {
