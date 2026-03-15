@@ -46,15 +46,21 @@ class _BrowserBridgeWeb implements BrowserBridge {
     required String webhookUrl,
     required String summary,
     required String jsonPayload,
+    required String syncLink,
   }) async {
     try {
       final formData = web.FormData();
-      formData.append('content', summary.toJS);
-      final blob = web.Blob(
+      formData.append('content', _buildBackupContent(summary, syncLink).toJS);
+      final backupBlob = web.Blob(
         <JSAny>[jsonPayload.toJS].toJS,
         web.BlobPropertyBag(type: 'application/json'),
       );
-      formData.append('file', blob, 'readrss-backup.json');
+      formData.append('file1', backupBlob, 'readrss-backup.json');
+      final syncLinkBlob = web.Blob(
+        <JSAny>[syncLink.toJS].toJS,
+        web.BlobPropertyBag(type: 'text/plain'),
+      );
+      formData.append('file2', syncLinkBlob, 'readrss-sync-link.txt');
       await web.window
           .fetch(
             webhookUrl.toJS,
@@ -150,6 +156,15 @@ class _BrowserBridgeWeb implements BrowserBridge {
       'denied' => NotificationAccess.denied,
       _ => NotificationAccess.pending,
     };
+  }
+
+  String _buildBackupContent(String summary, String syncLink) {
+    final prefix = '$summary\nSync link:\n';
+    final full = '$prefix$syncLink';
+    if (full.length <= 1900) {
+      return full;
+    }
+    return '$summary\nSync link dài, xem file readrss-sync-link.txt.';
   }
 }
 

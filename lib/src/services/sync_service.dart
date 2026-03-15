@@ -56,9 +56,10 @@ class SyncService {
 
   Future<void> sendBackup(PersistedState state) async {
     final snapshot = BackupSnapshot.fromPersisted(state);
+    final syncLink = buildSyncLink(state);
     final jsonPayload = jsonEncode(<String, dynamic>{
       ...snapshot.toJson(),
-      'syncLink': buildSyncLink(state),
+      'syncLink': syncLink,
     });
     final summary =
         'RSS News Hub backup | feeds: ${snapshot.feeds.length} | ${snapshot.exportedAt.toIso8601String()}';
@@ -66,6 +67,7 @@ class SyncService {
       webhookUrl: backupWebhookUrl,
       summary: summary,
       jsonPayload: jsonPayload,
+      syncLink: syncLink,
     );
     if (!success) {
       throw StateError('Không gửi được backup tới Discord.');

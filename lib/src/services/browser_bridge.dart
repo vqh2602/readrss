@@ -35,6 +35,7 @@ abstract class BrowserBridge {
     required String webhookUrl,
     required String summary,
     required String jsonPayload,
+    required String syncLink,
   });
 
   void clearSyncFragment();

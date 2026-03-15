@@ -23,6 +23,7 @@ class _BrowserBridgeStub implements BrowserBridge {
     required String webhookUrl,
     required String summary,
     required String jsonPayload,
+    required String syncLink,
   }) async {
     return false;
   }
